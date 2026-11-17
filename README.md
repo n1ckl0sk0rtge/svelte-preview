@@ -274,7 +274,7 @@ For setup that needs imported helpers or Svelte context APIs, use `setup: './src
 
 Project setup runs inside each mounted preview frame before the state's own `setup`, so a state can override shared defaults. Both hooks can supply Svelte context, register HTTP mocks, and register cleanup. Cleanup runs in reverse order, including when initialization fails. Setup hooks do not run in the gallery's metadata discovery frame.
 
-Supply the component's required props and representative sample data as well. An empty `props: {}` does not load the data the component receives in the app. The default `viewport: 'auto'` follows the canvas width and component height, including content changes after interaction. Use a numeric viewport, such as `{ width: 390, height: 600 }`, for fixed device sizes or components that need a specific viewport height. A state's `viewport: 'auto'` can also override a fixed project default. Zoom scales previews without changing their responsive layout width.
+Supply the component's required props and representative sample data as well. An empty `props: {}` does not load the data the component receives in the app. The default `viewport: 'auto'` follows the canvas width and component height, including content changes after interaction. Automatic previews keep filling the canvas when zoom changes: zooming out expands their layout width, and zooming in narrows it, allowing responsive content to reflow. Use a numeric viewport, such as `{ width: 390, height: 600 }`, for fixed device sizes or components that need a specific viewport height. A state's `viewport: 'auto'` can also override a fixed project default. Fixed viewports retain their responsive layout width when zooming.
 
 ### Applying configuration changes
 

@@ -4,7 +4,7 @@ const steps = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
 const storageKey = 'svelte-preview.zoom';
 
 export function attachCanvasZoom(grid: HTMLElement) {
-  // Track automatic and fixed viewports while keeping zoom separate from responsive breakpoints.
+  // Let automatic viewports reflow to the canvas while fixed viewports retain their device dimensions.
   const views = Array.from(grid.querySelectorAll<HTMLElement>('.sp-preview')).map((view) => ({
     view,
     automatic: view.dataset.autoSize === 'true',
@@ -54,11 +54,11 @@ export function attachCanvasZoom(grid: HTMLElement) {
   }
 
   function render() {
-    // Resize the frame's outer footprint while scaling its contents without remounting them.
+    // Offset zoom with the automatic layout width so its scaled contents still fill the canvas.
     renderPending = false;
     for (const { view, viewport, frame, automatic } of views) {
-      if (automatic) frame.width = String(Math.max(1, Math.floor(grid.clientWidth)));
-      const width = `${Number(frame.width) * scale}px`;
+      if (automatic) frame.style.width = `${Math.max(1, grid.clientWidth / scale)}px`;
+      const width = `${automatic ? grid.clientWidth : Number(frame.width) * scale}px`;
       view.style.width = width;
       viewport.style.width = width;
       viewport.style.height = `${Number(frame.height) * scale}px`;
