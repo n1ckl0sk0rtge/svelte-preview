@@ -73,7 +73,26 @@ Loaded: {
 }
 ```
 
-Use `{ pending: true }` for loading, `{ status: 503 }` for an error, or `{ body: null }` for an empty response. Other HTTP methods work too, such as `http.post`. Responses are isolated per frame; unmatched requests use the network as usual. See [ProductBrowser.preview.ts](examples/demo/src/lib/ProductBrowser.preview.ts) for all four states.
+Use `{ pending: true }` to leave a request unresolved, `{ status: 503 }` for an error, or `{ body: null }` for an empty response. Pending requests respect cancellation, including your application's request timeout, so they may eventually show an error instead of a loading state.
+
+For components that poll until a job finishes, return the API's normal processing response on every poll instead. For example, if your reader expects HTTP 202 and `statusType: 'PROCESSING'`:
+
+```ts
+Loading: {
+  props: {},
+  setup({ http }) {
+    // Complete each request while keeping the reader in its polling state.
+    http.get('/api/projection', {
+      status: 202,
+      body: { statusType: 'PROCESSING', data: null }
+    });
+  }
+}
+```
+
+Mocks remain registered for repeated requests, each with a fresh response body. Match the status and payload to your application's polling protocol; the runtime does not interpret processing responses or disable application timeouts.
+
+Other HTTP methods work too, such as `http.post`. Requests match by method and pathname, ignoring the origin and query string. Responses are isolated per frame; unmatched requests use the network as usual. The URL must still have the correct pathname: an undefined API base can produce a pathname containing `undefined/api/...`, which will miss a mock for `/api/...`. See [environment configuration](#environment-variables-and-api-bases) below and [ProductBrowser.preview.ts](examples/demo/src/lib/ProductBrowser.preview.ts) for the basic four states.
 
 ## Configure
 
@@ -93,6 +112,86 @@ export default defineConfig({
 Paths resolve from the package root, and `$lib` maps to `src/lib` automatically. Add any other aliases your components need to `aliases`; aliases from the app's Vite config are not loaded automatically.
 
 The preview mounts the selected component without the app's layout or routing. Component styles are compiled, but global CSS imports, style plugins, and theme initialization from the app need to be configured separately.
+
+### Environment variables and API bases
+
+The runtime starts a Vite development server with the environment mode `preview`. It loads `.env`, `.env.local`, `.env.preview`, and `.env.preview.local` from the package root. It does not load `.env.development` by default or inherit settings from the application's `vite.config.*`.
+
+For an API base read through `import.meta.env.VITE_API_BASE`, create `.env.preview`:
+
+```dotenv
+VITE_API_BASE=
+```
+
+Use the variable name your application actually reads. An empty base makes an expression such as `${import.meta.env.VITE_API_BASE}/api/products` produce `/api/products`, matching the registered mock.
+
+To load development environment files instead, set `mode: 'development'` in the preview config. Use `define` for explicit constant overrides without writing a Vite plugin:
+
+```ts
+import { defineConfig } from 'svelte-preview';
+
+export default defineConfig({
+  mode: 'development',
+  define: {
+    'import.meta.env.VITE_API_BASE': JSON.stringify('')
+  }
+});
+```
+
+`define` follows Vite's replacement syntax: use `JSON.stringify` for string constants, including empty strings. Only Vite's client environment variables (normally `VITE_*`) are exposed automatically; this does not implement SvelteKit's `$env/*` modules.
+
+For browser previews, `pnpm exec svelte-preview --root . --mode development` overrides the configured mode. Config functions receive the selected mode; when `mode` is selected by the config itself, the config is evaluated again with that mode. Keep config evaluation free of side effects. Restart after changing environment files, mode, or constant overrides.
+
+### SvelteKit imports and page fixtures
+
+Opt into preview-only SvelteKit shims to render components whose dependencies import application state. This does not start the SvelteKit router or load the app's layouts:
+
+```ts
+import { defineConfig } from 'svelte-preview';
+
+export default defineConfig({
+  sveltekit: {
+    page: {
+      url: '/projects/demo',
+      route: { id: '/projects/[id]' },
+      params: { id: 'demo' },
+      data: { title: 'Demo project' }
+    }
+  }
+});
+```
+
+Use `sveltekit: true` for the defaults: URL `http://preview.local/`, an unmatched route, empty params/data/state, status 200, and null error/form. The supported modules are:
+
+| Import | Preview behavior |
+| --- | --- |
+| `$app/env`, `$app/environment` | `browser` and `dev` are true; `building` and `prerendering` are false; `version` is an empty string. |
+| `$app/state` | Static `page` fixtures, an idle `navigating` object, and `updated.current`/`updated.check()` returning false. |
+| `$app/navigation` | `goto()` logs the resolved destination and options in the frame's browser console and returns a resolved promise. The frame URL and page fixtures stay unchanged. |
+
+Override page fields for a named state in its neighbouring preview definition:
+
+```ts
+export default definePreviews(ProjectTable, {
+  Default: { props: {} },
+  AnotherProject: {
+    props: {},
+    sveltekit: {
+      page: {
+        url: '/projects/another?tab=assets',
+        params: { id: 'another' },
+        data: { title: 'Another project' }
+      }
+    }
+  }
+});
+```
+
+Top-level page fields override project defaults. Objects such as `params` and `data` are replaced in full. Project defaults must be JSON-compatible; state fixtures must be structured-cloneable. Each frame gets its own copy.
+
+Project defaults are available during module imports. State overrides apply after the preview definition is imported, before project/state setup hooks and component initialization. Read state-specific page values during component initialization or setup, rather than capturing them at module scope.
+
+These fixtures stay static during interaction. Route loading, form actions, reactive navigation, other navigation exports, `$app/stores`, and `$env/*` are not implemented. Existing explicit aliases take precedence over the built-in shims; remove aliases for modules you want the shims to supply. State fixtures require `sveltekit` to be enabled in the project config. Restart after enabling or disabling the shims or changing aliases.
 
 ### Global styles
 
@@ -179,9 +278,7 @@ Supply the component's required props and representative sample data as well. An
 
 ### Applying configuration changes
 
-Save component, preview definition, or CSS changes to refresh the preview. After changing aliases, plugins, or Svelte compiler/preprocessor settings, choose **Svelte Preview → gear menu → Restart**. Restart also picks up changes to a locally linked runtime; the IDE plugin does not need reinstalling for runtime-only changes.
-
-SvelteKit `$app/*` modules, route loading, and form actions are not supported yet.
+Save component, preview definition, or CSS changes to refresh the preview. After changing aliases, plugins, environment settings, shim support, or Svelte compiler/preprocessor settings, choose **Svelte Preview → gear menu → Restart**. Restart also picks up changes to a locally linked runtime; the IDE plugin does not need reinstalling for runtime-only changes.
 
 ## Try the demo or browser preview
 

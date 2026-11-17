@@ -1,5 +1,5 @@
 import type { Component, ComponentProps } from 'svelte';
-import type { PluginOption } from 'vite';
+import type { PluginOption, UserConfig } from 'vite';
 
 export interface Viewport {
   width: number;
@@ -39,8 +39,28 @@ export interface PreviewSetupContext {
   onCleanup(callback: () => void): void;
 }
 
+/** Static page values for the opt-in SvelteKit shims; these do not run route loaders. */
+export interface PreviewSvelteKitPage {
+  /** Absolute URL or path relative to http://preview.local. Defaults to /. */
+  url?: string;
+  params?: Record<string, string>;
+  route?: { id: string | null };
+  data?: Record<string, unknown>;
+  state?: Record<string, unknown>;
+  status?: number;
+  error?: unknown;
+  form?: unknown;
+}
+
+export interface PreviewSvelteKit {
+  /** Top-level page fields override project defaults; supply data and params in full. */
+  page?: PreviewSvelteKitPage;
+}
+
 export interface PreviewState<Props> {
   props: Props;
+  /** Page fixtures for this frame. Requires sveltekit to be enabled in the project config. */
+  sveltekit?: PreviewSvelteKit;
   /** Creates dependencies for this preview before its component and descendants initialize. */
   setup?: PreviewSetup;
   /** Size of this named preview. Omit to use the project default; auto follows the canvas and content. */
@@ -55,6 +75,12 @@ export interface PreviewDefinition<C extends Component<any>> {
 export type PreviewTheme = 'auto' | 'light' | 'dark';
 
 export interface PreviewConfig {
+  /** Vite environment mode, selecting .env.[mode]. Defaults to preview; --mode takes precedence. */
+  mode?: string;
+  /** Vite constant replacements. String values must be JSON.stringify'd JavaScript expressions. */
+  define?: UserConfig['define'];
+  /** Opt into static $app/environment ($app/env), $app/state, and goto() shims. */
+  sveltekit?: boolean | PreviewSvelteKit;
   /** Paths relative to the directory containing svelte-preview.config.ts. */
   styles?: string[];
   /** Vite plugins needed by the preview, e.g. Tailwind. Restart after changing these. */

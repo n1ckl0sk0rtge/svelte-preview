@@ -17,6 +17,17 @@ export function definePreviews(component, states) {
       throw new Error(`Preview state "${name}" needs a props object.`);
     }
     if (state.viewport) validateViewport(state.viewport);
+
+    // Reject malformed page fixtures before a frame attempts to apply its state overrides.
+    const kit = state.sveltekit;
+    const page = kit?.page;
+    const invalidKit = kit !== undefined && (!kit || typeof kit !== 'object' || Array.isArray(kit));
+    const invalidPage = page !== undefined && (!page || typeof page !== 'object' || Array.isArray(page));
+    if (invalidKit || invalidPage) {
+      throw new Error(`Preview state "${name}" sveltekit must be an object with page fixtures.`);
+    }
+
+    // Setup hooks must finish registration before the component tree initializes.
     if (state.setup !== undefined && typeof state.setup !== 'function') {
       throw new Error(`Preview state "${name}" setup must be a function.`);
     }

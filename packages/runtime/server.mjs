@@ -8,6 +8,13 @@ import { validateViewport } from './index.mjs';
 
 const runtimeRoot = fileURLToPath(new URL('.', import.meta.url));
 const prefix = '/@svelte-preview/';
+const kitPrefix = 'virtual:svelte-preview/sveltekit/';
+const kitModules = new Map([
+  ['$app/environment', 'environment'],
+  ['$app/env', 'environment'],
+  ['$app/state', 'state'],
+  ['$app/navigation', 'navigation']
+]);
 const ignoredDirectories = new Set(['node_modules', '.git', '.svelte-kit', '.idea', '.gradle', 'build', 'dist', 'output']);
 
 export async function resolveComponent(root, value) {
@@ -50,16 +57,33 @@ async function listComponents(root, directory = root) {
   return nested.flat().sort();
 }
 
-async function readConfig(root) {
+function validateMode(mode) {
+  if (typeof mode !== 'string' || !mode.trim() || mode === 'local') {
+    throw new Error('Preview mode must be a non-empty string other than local.');
+  }
+}
+
+async function readConfig(root, mode) {
   // Load a dedicated config so previewing a component never starts the application's server hooks.
   const file = ['svelte-preview.config.ts', 'svelte-preview.config.js', 'svelte-preview.config.mjs']
     .map((name) => path.join(root, name)).find(existsSync);
-  const result = file ? await loadConfigFromFile({ command: 'serve', mode: 'preview' }, file, root, 'silent') : null;
+  const result = file ? await loadConfigFromFile({ command: 'serve', mode }, file, root, 'silent') : null;
   const config = result?.config ?? {};
   const viewport = config.viewport ?? 'auto';
   validateViewport(viewport);
   const theme = config.theme ?? 'auto';
   if (!['auto', 'light', 'dark'].includes(theme)) throw new Error('Preview theme must be auto, light, or dark.');
+
+  // Reject malformed environment and shim options before starting the listener.
+  if (config.mode !== undefined) validateMode(config.mode);
+  if (config.sveltekit !== undefined && typeof config.sveltekit !== 'boolean'
+    && (!config.sveltekit || typeof config.sveltekit !== 'object' || Array.isArray(config.sveltekit))) {
+    throw new Error('Preview sveltekit must be a boolean or an object with page fixtures.');
+  }
+  const page = config.sveltekit?.page;
+  if (page !== undefined && (!page || typeof page !== 'object' || Array.isArray(page))) {
+    throw new Error('Preview sveltekit.page must be a page fixture object.');
+  }
 
   // Validate browser setup and CSS imports before Vite compiles the preview entry.
   if (config.setup != null && !['function', 'string'].includes(typeof config.setup)) {
@@ -89,10 +113,13 @@ function documentHtml(entry, theme) {
   return `<!doctype html><html lang="en" data-preview-theme="${theme}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Svelte Preview</title></head><body><div id="app"></div><script type="module" src="${entry}"></script></body></html>`;
 }
 
-export async function startPreviewServer({ root = process.cwd(), port = 0 } = {}) {
+export async function startPreviewServer({ root = process.cwd(), port = 0, mode } = {}) {
   // Reuse the project's Svelte configuration and aliases without booting SvelteKit routing.
   root = realpathSync(root);
-  const initialConfig = await readConfig(root);
+  if (mode !== undefined) validateMode(mode);
+  let initialConfig = await readConfig(root, mode ?? 'preview');
+  const effectiveMode = mode ?? initialConfig.mode ?? 'preview';
+  if (effectiveMode !== (mode ?? 'preview')) initialConfig = await readConfig(root, effectiveMode);
   const aliases = Object.fromEntries(Object.entries(initialConfig.aliases ?? {}).map(([key, value]) => [key, path.resolve(root, value)]));
   const asImport = (file) => `/@fs/${normalizePath(file)}`;
   const clientEntry = asImport(path.join(runtimeRoot, 'client/main.ts'));
@@ -104,15 +131,34 @@ export async function startPreviewServer({ root = process.cwd(), port = 0 } = {}
   const previewPlugin = {
     name: 'svelte-component-previews',
     resolveId(id) {
+      // Explicit project aliases take precedence; only opt-in Kit imports reach these virtual modules.
+      if (initialConfig.sveltekit && kitModules.has(id)) return '\0' + kitPrefix + kitModules.get(id);
+      if (id.startsWith(kitPrefix)) return '\0' + id;
       if (id.startsWith(prefix)) return '\0' + id;
     },
     async load(id) {
+      // Share one static page object across the state and navigation shims inside each document.
+      if (id.startsWith('\0' + kitPrefix)) {
+        const module = id.slice(('\0' + kitPrefix).length);
+        if (module === 'environment') return 'export const browser = true, dev = true, building = false, prerendering = false, version = "";';
+        if (module === 'navigation') return `export { goto } from ${JSON.stringify(kitPrefix + 'state')};`;
+        if (module === 'state') {
+          const config = await readConfig(root, effectiveMode);
+          return `import { createSvelteKitState } from ${JSON.stringify(asImport(path.join(runtimeRoot, 'sveltekit.mjs')))};
+const kit = createSvelteKitState();
+const defaults = ${JSON.stringify(config.sveltekit?.page ?? {})};
+export const { page, navigating, updated, goto } = kit;
+export const configurePage = (page) => kit.configurePage(defaults, page);
+configurePage();`;
+        }
+        return;
+      }
       if (!id.startsWith('\0' + prefix)) return;
 
       // Generate static imports so Vite can track fixture and component dependencies for live updates.
       const url = new URL(id.slice(1), 'http://preview.local');
       const target = await resolveComponent(root, url.searchParams.get('file'));
-      const config = await readConfig(root);
+      const config = await readConfig(root, effectiveMode);
       if (!target.preview) {
         return `import { showMissingPreview } from ${JSON.stringify(clientEntry)};\nshowMissingPreview(${JSON.stringify(target.relative)});`;
       }
@@ -124,7 +170,13 @@ export async function startPreviewServer({ root = process.cwd(), port = 0 } = {}
       // Inline self-contained hooks or import their module without including the server config in frames.
       const setup = typeof config.setup === 'function' ? `const setup = ${inlineSetupExpression(config.setup)};`
         : config.setup ? `const { default: setup } = await import(${JSON.stringify(asImport(config.setup))});` : 'const setup = undefined;';
-      return `${styles}\nimport { boot, reportError } from ${JSON.stringify(clientEntry)};\ntry { ${setup} const { default: definition } = await import(${JSON.stringify(asImport(target.preview))}); boot(definition, ${JSON.stringify(config.viewport)}, setup); } catch (error) { reportError(error); }`;
+
+      // Project fixtures initialize before imports; state overrides apply before setup and component mounting.
+      const kitImport = initialConfig.sveltekit ? `import { configurePage } from ${JSON.stringify(kitPrefix + 'state')};` : '';
+      const kitSetup = initialConfig.sveltekit
+        ? 'configurePage(definition.states[new URLSearchParams(location.search).get("state")]?.sveltekit?.page);'
+        : 'if (Object.values(definition.states).some(state => state.sveltekit !== undefined)) throw new Error("Enable sveltekit in svelte-preview.config to use page fixtures.");';
+      return `${styles}\nimport { boot, reportError } from ${JSON.stringify(clientEntry)};\n${kitImport}\ntry { ${setup} const { default: definition } = await import(${JSON.stringify(asImport(target.preview))}); ${kitSetup} boot(definition, ${JSON.stringify(config.viewport)}, setup); } catch (error) { reportError(error); }`;
     },
     handleHotUpdate(context) {
       // A full reset keeps all state cards deterministic after component, fixture, or CSS edits.
@@ -187,7 +239,7 @@ export async function startPreviewServer({ root = process.cwd(), port = 0 } = {}
             }
             response.setHeader('Content-Type', 'text/html; charset=utf-8');
             response.setHeader('Cache-Control', 'no-store');
-            const config = await readConfig(root);
+            const config = await readConfig(root, effectiveMode);
             response.end(await server.transformIndexHtml(url.pathname, documentHtml(entry, config.theme)));
             return;
           }
@@ -214,7 +266,8 @@ export async function startPreviewServer({ root = process.cwd(), port = 0 } = {}
   const server = await createServer({
     root,
     configFile: false,
-    mode: 'preview',
+    mode: effectiveMode,
+    define: initialConfig.define,
     appType: 'custom',
     clearScreen: false,
     plugins: [previewPlugin, svelte(svelteOptions), ...(initialConfig.plugins ?? [])],

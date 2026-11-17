@@ -65,3 +65,19 @@ test('pending mocks honor request cancellation and preview cleanup', async t => 
   cleanup();
   assert.equal(globalThis.fetch, original);
 });
+
+test('processing responses stay available for repeated polling requests', async t => {
+  // Return completed HTTP responses so each poll avoids the application's per-request timeout.
+  const cleanup = mockFetch({
+    'GET /projection': { status: 202, body: { statusType: 'PROCESSING', data: null } }
+  })();
+  t.after(cleanup);
+
+  // Each poll receives its own readable body rather than consuming a one-shot response.
+  for (let poll = 0; poll < 3; poll += 1) {
+    const response = await fetch(`/projection?poll=${poll}`);
+    assert.equal(response.status, 202);
+    assert.equal(response.ok, true);
+    assert.deepEqual(await response.json(), { statusType: 'PROCESSING', data: null });
+  }
+});

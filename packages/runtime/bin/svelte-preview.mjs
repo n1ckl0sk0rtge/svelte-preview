@@ -8,18 +8,19 @@ try {
     options: {
       root: { type: 'string', default: process.cwd() },
       port: { type: 'string', default: '0' },
+      mode: { type: 'string' },
       help: { type: 'boolean', short: 'h' }
     }
   });
   if (values.help) {
-    console.log('svelte-preview [--root <project-directory>] [--port <port>]');
+    console.log('svelte-preview [--root <project-directory>] [--port <port>] [--mode <mode>]');
     process.exit(0);
   }
 
   // Emit one machine-readable readiness message after the HTTP server is listening.
   const port = Number(values.port);
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Invalid port.');
-  const server = await startPreviewServer({ root: values.root, port });
+  const server = await startPreviewServer({ root: values.root, port, mode: values.mode });
   console.log(`SVELTE_PREVIEW_READY ${JSON.stringify({ url: server.resolvedUrls.local[0] })}`);
 
   // Release the listener and file watchers when the IDE stops the child process.
