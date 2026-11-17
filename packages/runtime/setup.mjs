@@ -1,6 +1,6 @@
 import { mockFetch } from './mock-fetch.mjs';
 
-export function runPreviewSetup(setup) {
+export function runPreviewSetup(...setups) {
   // Keep registrations and their lifetime local to this preview frame.
   const cleanups = [];
   const responses = Object.create(null);
@@ -44,13 +44,15 @@ export function runPreviewSetup(setup) {
     }
   ]));
 
-  // Setup runs inside the Svelte wrapper; returned cleanup functions remain supported.
+  // Project and state setup share registrations; later hooks can override defaults before mounting.
   try {
-    const result = setup?.({ http, onCleanup });
-    if (result !== undefined && typeof result !== 'function') {
-      throw new Error('Preview setup must be synchronous and return only a cleanup function or nothing.');
+    for (const setup of setups) {
+      const result = setup?.({ http, onCleanup });
+      if (result !== undefined && typeof result !== 'function') {
+        throw new Error('Preview setup must be synchronous and return only a cleanup function or nothing.');
+      }
+      if (result) onCleanup(result);
     }
-    if (result) onCleanup(result);
   } catch (error) {
     // Failed initialization must also undo mocks and resources that were already registered.
     try {

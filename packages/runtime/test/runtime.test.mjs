@@ -15,6 +15,11 @@ test('preview definitions preserve callback props and reject invalid states', ()
   assert.throws(() => definePreviews(() => {}, { Default: {} }), /props object/);
   assert.throws(() => definePreviews(() => {}, { Default: { props: {}, viewport: { width: -1, height: 340 } } }), /viewport/);
   assert.throws(() => validateViewport({ width: Infinity, height: 340 }), /viewport/);
+
+  // Automatic sizing is valid for individual states as well as the project default.
+  assert.equal(definePreviews(() => {}, { Default: { props: {}, viewport: 'auto' } }).states.Default.viewport, 'auto');
+  assert.doesNotThrow(() => validateViewport('auto'));
+  assert.throws(() => validateViewport('full'), /viewport/);
 });
 
 test('setup hooks are preserved without execution and invalid hooks are rejected', () => {
@@ -125,3 +130,74 @@ test('preview configuration validates and supplies explicit themes to every docu
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('project setup is imported into frames without running during server configuration or gallery discovery', async t => {
+  // Keep browser-only setup out of the server's config module and component discovery.
+  const root = await mkdtemp(path.join(os.tmpdir(), 'svelte-preview-project-setup-'));
+  let server;
+  t.after(async () => {
+    await server?.close();
+    await rm(root, { recursive: true, force: true });
+  });
+  await symlink(fileURLToPath(new URL('../../../examples/demo/node_modules', import.meta.url)), path.join(root, 'node_modules'));
+  await writeFile(path.join(root, 'package.json'), '{"type":"module"}');
+  await writeFile(path.join(root, 'Card.svelte'), '<p>Card</p>');
+  await writeFile(path.join(root, 'Card.preview.js'), 'export default {};');
+  const config = path.join(root, 'svelte-preview.config.mjs');
+  await writeFile(config, "export default { setup: './preview.setup.ts' };");
+  await writeFile(path.join(root, 'preview.setup.ts'), `import type { PreviewSetup } from 'svelte-preview';
+const setup: PreviewSetup = () => { document.documentElement.setAttribute('theme', 'g100'); };
+export default setup;`);
+
+  // The real Vite pipeline compiles the setup module and passes its export to the frame boot function.
+  server = await startPreviewServer({ root });
+  const frame = await server.transformRequest('/@svelte-preview/frame?file=Card.svelte');
+  const gallery = await server.transformRequest('/@svelte-preview/gallery?file=Card.svelte');
+  const setup = await server.transformRequest('/preview.setup.ts');
+  assert.match(frame.code, /import\([^)]*preview\.setup\.ts/);
+  assert.match(frame.code, /boot\(definition, [^;]*, setup\)/);
+  assert.match(frame.code, /boot\(definition, "auto", setup\)/);
+  assert.doesNotMatch(gallery.code, /preview\.setup|g100/);
+  assert.match(setup.code, /document\.documentElement/);
+
+  // Missing setup files fail before a new preview server is started.
+  await server.close();
+  server = undefined;
+  await writeFile(config, "export default { setup: './missing.setup.ts' };");
+  await assert.rejects(startPreviewServer({ root }), { code: 'ENOENT' });
+});
+
+for (const [name, declaration] of [
+  ['method', 'setup({ onCleanup })'],
+  ['arrow', 'setup: ({ onCleanup }) =>'],
+  ['function', 'setup: function ({ onCleanup })']
+]) {
+  test(`inline project setup supports ${name} syntax without executing on the server`, async t => {
+    // Keep DOM access inside setup so loading the server config cannot execute browser initialization.
+    const root = await mkdtemp(path.join(os.tmpdir(), 'svelte-preview-inline-setup-'));
+    let server;
+    t.after(async () => {
+      await server?.close();
+      await rm(root, { recursive: true, force: true });
+    });
+    await symlink(fileURLToPath(new URL('../../../examples/demo/node_modules', import.meta.url)), path.join(root, 'node_modules'));
+    await writeFile(path.join(root, 'package.json'), '{"type":"module"}');
+    await writeFile(path.join(root, 'Card.svelte'), '<p>Card</p>');
+    await writeFile(path.join(root, 'Card.preview.js'), 'export default {};');
+    await writeFile(path.join(root, 'svelte-preview.config.mjs'), `export default {
+      ${declaration} {
+        document.documentElement.setAttribute('theme', 'g100');
+        onCleanup(() => document.documentElement.removeAttribute('theme'));
+      }
+    };`);
+
+    // Compile the browser hook through Vite, preserving its cleanup while excluding it from the gallery.
+    server = await startPreviewServer({ root });
+    const frame = await server.transformRequest('/@svelte-preview/frame?file=Card.svelte');
+    const gallery = await server.transformRequest('/@svelte-preview/gallery?file=Card.svelte');
+    assert.match(frame.code, /document\.documentElement\.setAttribute/);
+    assert.match(frame.code, /onCleanup/);
+    assert.match(frame.code, /boot\(definition, [^;]*, setup\)/);
+    assert.doesNotMatch(gallery.code, /document\.documentElement|g100/);
+  });
+}

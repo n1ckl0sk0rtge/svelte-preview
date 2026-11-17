@@ -4,14 +4,15 @@
   import type { PreviewSetup } from '../index.js';
   import { runPreviewSetup } from '../setup.mjs';
 
-  let { component: View, props, setup }: {
+  let { component: View, props, projectSetup, setup }: {
     component: Component<any>;
     props: Record<string, unknown>;
+    projectSetup?: PreviewSetup;
     setup?: PreviewSetup;
   } = $props();
 
-  // Establish context once during this wrapper's initialization, before descendants are created.
-  const cleanup = untrack(() => runPreviewSetup(setup));
+  // Establish project defaults before state setup, once during initialization and before descendants are created.
+  const cleanup = untrack(() => runPreviewSetup(projectSetup, setup));
 
   // Dispose repositories and subscriptions with the component tree when its frame is unloaded.
   onDestroy(cleanup);

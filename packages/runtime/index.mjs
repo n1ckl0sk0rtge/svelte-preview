@@ -1,6 +1,7 @@
 export function validateViewport(viewport) {
+  if (viewport === 'auto') return;
   if (!viewport || !['width', 'height'].every((key) => Number.isInteger(viewport[key]) && viewport[key] >= 100 && viewport[key] <= 4096)) {
-    throw new Error('Preview viewport width and height must be integers between 100 and 4096.');
+    throw new Error('Preview viewport must be auto, or width and height must be integers between 100 and 4096.');
   }
 }
 

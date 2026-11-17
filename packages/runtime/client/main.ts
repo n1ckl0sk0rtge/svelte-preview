@@ -1,9 +1,10 @@
 import { flushSync, mount, unmount } from 'svelte';
 import type { Component } from 'svelte';
-import type { PreviewDefinition, PreviewTheme, Viewport } from '../index.js';
+import type { PreviewDefinition, PreviewSetup, PreviewTheme, PreviewViewport } from '../index.js';
 import './shell.css';
 import { initializeTheme, previewLink } from './theme.js';
 import { attachCanvasZoom } from './zoom.js';
+import { observePreviewHeight } from './sizing.js';
 import PreviewRoot from './PreviewRoot.svelte';
 
 // Establish the chosen appearance before mounting components or running their lifecycle callbacks.
@@ -94,7 +95,7 @@ export function showMissingPreview(file: string) {
   target.replaceChildren(section);
 }
 
-export function boot(definition: PreviewDefinition<Component<any>>, defaultViewport: Viewport) {
+export function boot(definition: PreviewDefinition<Component<any>>, defaultViewport: PreviewViewport, projectSetup?: PreviewSetup) {
   try {
     // Discover state names inside an isolated document so component global CSS never reaches the gallery.
     if (parameters.has('metadata')) {
@@ -109,15 +110,19 @@ export function boot(definition: PreviewDefinition<Component<any>>, defaultViewp
       const state = definition.states[stateName];
       if (!state) throw new Error(`Unknown preview state: ${stateName}`);
       document.body.style.margin = '0';
+      const stopSizing = (state.viewport ?? defaultViewport) === 'auto' ? observePreviewHeight(target) : undefined;
       const instance = mount(PreviewRoot, {
         target,
-        props: { component: definition.component, props: state.props, setup: state.setup }
+        props: { component: definition.component, props: state.props, projectSetup, setup: state.setup }
       });
       flushSync();
 
       // Run Svelte destruction hooks and preview cleanup on refresh or navigation, preserving bfcache restores.
       window.addEventListener('pagehide', (event) => {
-        if (!event.persisted) void unmount(instance).catch(reportError);
+        if (!event.persisted) {
+          stopSizing?.();
+          void unmount(instance).catch(reportError);
+        }
       });
       window.addEventListener('error', (event) => reportError(event.error ?? event.message));
       window.addEventListener('unhandledrejection', (event) => reportError(event.reason));
@@ -163,24 +168,24 @@ export function showGallery() {
     if (event.data?.type !== 'svelte-preview:manifest') return;
     settled = true;
     window.clearTimeout(timeout);
-    const states: { name: string; viewport: Viewport }[] = event.data.states;
+    const states: { name: string; viewport: PreviewViewport }[] = event.data.states;
     target.replaceChildren();
     const grid = element('main', 'sp-grid');
+    target.append(grid);
     for (const { name, viewport } of states) {
-      // Keep each view at its configured size with only a quiet caption underneath.
+      // Automatic previews fill a canvas row; explicit viewports keep their device dimensions.
       const view = element('figure', 'sp-preview');
-      view.style.width = `${viewport.width}px`;
+      if (viewport === 'auto') view.dataset.autoSize = 'true';
       const frame = element('iframe', 'sp-frame');
       frame.title = `${name} preview`;
-      frame.width = String(viewport.width);
-      frame.height = String(viewport.height);
+      frame.width = String(viewport === 'auto' ? Math.max(1, Math.floor(grid.clientWidth)) : viewport.width);
+      frame.height = String(viewport === 'auto' ? 1 : viewport.height);
       frame.src = previewLink('/__preview/frame', { file, state: name });
       const canvas = element('div', 'sp-viewport');
       canvas.append(frame);
       view.append(canvas, element('figcaption', 'sp-caption', name));
       grid.append(view);
     }
-    target.append(grid);
     attachCanvasZoom(grid);
   });
   target.append(probe);

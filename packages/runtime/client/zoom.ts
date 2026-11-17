@@ -4,9 +4,10 @@ const steps = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
 const storageKey = 'svelte-preview.zoom';
 
 export function attachCanvasZoom(grid: HTMLElement) {
-  // Keep the actual iframe dimensions intact so zoom never changes responsive breakpoints.
+  // Track automatic and fixed viewports while keeping zoom separate from responsive breakpoints.
   const views = Array.from(grid.querySelectorAll<HTMLElement>('.sp-preview')).map((view) => ({
     view,
+    automatic: view.dataset.autoSize === 'true',
     viewport: view.querySelector<HTMLElement>('.sp-viewport')!,
     frame: view.querySelector<HTMLIFrameElement>('.sp-frame')!
   }));
@@ -43,6 +44,10 @@ export function attachCanvasZoom(grid: HTMLElement) {
   function apply(next: number) {
     // Accumulate gesture input immediately, then render at most once per screen refresh.
     scale = Math.min(maximum, Math.max(minimum, Math.round(next * 100) / 100));
+    schedule();
+  }
+
+  function schedule() {
     if (renderPending) return;
     renderPending = true;
     window.requestAnimationFrame(render);
@@ -51,7 +56,8 @@ export function attachCanvasZoom(grid: HTMLElement) {
   function render() {
     // Resize the frame's outer footprint while scaling its contents without remounting them.
     renderPending = false;
-    for (const { view, viewport, frame } of views) {
+    for (const { view, viewport, frame, automatic } of views) {
+      if (automatic) frame.width = String(Math.max(1, Math.floor(grid.clientWidth)));
       const width = `${Number(frame.width) * scale}px`;
       view.style.width = width;
       viewport.style.width = width;
@@ -128,6 +134,28 @@ export function attachCanvasZoom(grid: HTMLElement) {
     input.addEventListener('blur', () => setWheelZoom(false));
     if (wheelZoomEnabled) input.addEventListener('wheel', wheel, { passive: false });
   }
+
+  // Accept content heights only from this gallery's own automatic preview frames.
+  window.addEventListener('message', (event: MessageEvent) => {
+    if (event.origin !== window.location.origin || event.data?.type !== 'svelte-preview:resize') return;
+    const preview = views.find(({ frame, automatic }) => automatic && frame.contentWindow === event.source);
+    const height = event.data.height;
+    if (!preview || !Number.isFinite(height) || height < 1) return;
+    preview.frame.height = String(Math.ceil(height));
+    schedule();
+  });
+
+  // Follow tool-window width changes without feeding content-height changes back into layout.
+  let canvasWidth = grid.clientWidth;
+  const observer = new ResizeObserver(() => {
+    if (grid.clientWidth === canvasWidth) return;
+    canvasWidth = grid.clientWidth;
+    schedule();
+  });
+  observer.observe(grid);
+  window.addEventListener('pagehide', event => {
+    if (!event.persisted) observer.disconnect();
+  });
 
   // Apply the same zoom gestures over both the canvas and the interactive component documents.
   zoomOut.onclick = () => step(-1);

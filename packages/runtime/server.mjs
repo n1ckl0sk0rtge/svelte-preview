@@ -3,7 +3,7 @@ import { access, readdir, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer, loadConfigFromFile, normalizePath } from 'vite';
-import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { loadSvelteConfig, svelte, vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import { validateViewport } from './index.mjs';
 
 const runtimeRoot = fileURLToPath(new URL('.', import.meta.url));
@@ -56,15 +56,32 @@ async function readConfig(root) {
     .map((name) => path.join(root, name)).find(existsSync);
   const result = file ? await loadConfigFromFile({ command: 'serve', mode: 'preview' }, file, root, 'silent') : null;
   const config = result?.config ?? {};
-  const viewport = config.viewport ?? { width: 360, height: 340 };
+  const viewport = config.viewport ?? 'auto';
   validateViewport(viewport);
   const theme = config.theme ?? 'auto';
   if (!['auto', 'light', 'dark'].includes(theme)) throw new Error('Preview theme must be auto, light, or dark.');
 
-  // Validate CSS imports before Vite compiles the preview entry.
+  // Validate browser setup and CSS imports before Vite compiles the preview entry.
+  if (config.setup != null && !['function', 'string'].includes(typeof config.setup)) {
+    throw new Error('Preview setup must be a function or a browser module path.');
+  }
+  const setup = typeof config.setup === 'string' ? path.resolve(root, config.setup) : config.setup ?? null;
+  if (typeof setup === 'string') await access(setup);
   const styles = (config.styles ?? []).map((style) => path.resolve(root, style));
   for (const style of styles) await access(style);
-  return { ...config, viewport, styles, theme };
+  return { ...config, viewport, styles, theme, setup };
+}
+
+function inlineSetupExpression(setup) {
+  // Preserve browser code without invoking it or importing the server config into frames.
+  const source = Function.prototype.toString.call(setup);
+  try {
+    new Function(`return (${source});`);
+    return `(${source})`;
+  } catch {
+    // Object method shorthand needs its object wrapper to remain valid JavaScript.
+    return `Object.values({${source}})[0]`;
+  }
 }
 
 function documentHtml(entry, theme) {
@@ -79,6 +96,10 @@ export async function startPreviewServer({ root = process.cwd(), port = 0 } = {}
   const aliases = Object.fromEntries(Object.entries(initialConfig.aliases ?? {}).map(([key, value]) => [key, path.resolve(root, value)]));
   const asImport = (file) => `/@fs/${normalizePath(file)}`;
   const clientEntry = asImport(path.join(runtimeRoot, 'client/main.ts'));
+
+  // Support project style languages when preprocessing is configured only in the app's Vite setup.
+  const svelteConfig = await loadSvelteConfig({ root });
+  const svelteOptions = svelteConfig?.preprocess == null ? { preprocess: vitePreprocess() } : {};
 
   const previewPlugin = {
     name: 'svelte-component-previews',
@@ -99,7 +120,11 @@ export async function startPreviewServer({ root = process.cwd(), port = 0 } = {}
         return `import { showGallery } from ${JSON.stringify(clientEntry)};\nshowGallery();`;
       }
       const styles = url.pathname.endsWith('/frame') ? config.styles.map((style) => `import ${JSON.stringify(asImport(style))};`).join('\n') : '';
-      return `${styles}\nimport { boot, reportError } from ${JSON.stringify(clientEntry)};\ntry { const { default: definition } = await import(${JSON.stringify(asImport(target.preview))}); boot(definition, ${JSON.stringify(config.viewport)}); } catch (error) { reportError(error); }`;
+
+      // Inline self-contained hooks or import their module without including the server config in frames.
+      const setup = typeof config.setup === 'function' ? `const setup = ${inlineSetupExpression(config.setup)};`
+        : config.setup ? `const { default: setup } = await import(${JSON.stringify(asImport(config.setup))});` : 'const setup = undefined;';
+      return `${styles}\nimport { boot, reportError } from ${JSON.stringify(clientEntry)};\ntry { ${setup} const { default: definition } = await import(${JSON.stringify(asImport(target.preview))}); boot(definition, ${JSON.stringify(config.viewport)}, setup); } catch (error) { reportError(error); }`;
     },
     handleHotUpdate(context) {
       // A full reset keeps all state cards deterministic after component, fixture, or CSS edits.
@@ -192,7 +217,7 @@ export async function startPreviewServer({ root = process.cwd(), port = 0 } = {}
     mode: 'preview',
     appType: 'custom',
     clearScreen: false,
-    plugins: [previewPlugin, svelte()],
+    plugins: [previewPlugin, svelte(svelteOptions), ...(initialConfig.plugins ?? [])],
     resolve: { alias: { $lib: path.join(root, 'src/lib'), ...aliases }, dedupe: ['svelte'] },
     server: { host: '127.0.0.1', port, strictPort: port !== 0, cors: false, fs: { allow: [root, runtimeRoot] } }
   });

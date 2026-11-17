@@ -108,3 +108,47 @@ test('HTTP methods register independent responses on the same path', async t => 
     assert.equal(await response.text(), body, method);
   }
 });
+
+test('project setup runs before state setup with shared mocks and reverse cleanup', async t => {
+  // Establish project defaults, then let a state override them in the same setup context.
+  const original = globalThis.fetch;
+  const events = [];
+  let projectContext;
+  const cleanup = runPreviewSetup(context => {
+    projectContext = context;
+    events.push('project');
+    context.http.get('/theme', { body: 'project' });
+    context.http.get('/shared', { body: 'shared' });
+    context.onCleanup(() => events.push('project cleanup'));
+  }, undefined, context => {
+    assert.equal(context.http, projectContext.http);
+    events.push('state');
+    context.http.get('/theme', { body: 'state' });
+    return () => events.push('state cleanup');
+  });
+  t.after(cleanup);
+
+  // State overrides keep unrelated project mocks and dispose before project defaults.
+  assert.deepEqual(events, ['project', 'state']);
+  assert.equal(await (await fetch('/theme')).json(), 'state');
+  assert.equal(await (await fetch('/shared')).json(), 'shared');
+  cleanup();
+  cleanup();
+  assert.deepEqual(events, ['project', 'state', 'state cleanup', 'project cleanup']);
+  assert.equal(globalThis.fetch, original);
+});
+
+test('failed state setup also rolls back project resources', () => {
+  // A state that cannot initialize must release everything established by project setup.
+  const original = globalThis.fetch;
+  const events = [];
+  assert.throws(() => runPreviewSetup(({ http, onCleanup }) => {
+    http.get('/shared', { body: 'shared' });
+    onCleanup(() => events.push('project cleanup'));
+  }, ({ onCleanup }) => {
+    onCleanup(() => events.push('state cleanup'));
+    throw new Error('State setup failed');
+  }), /State setup failed/);
+  assert.deepEqual(events, ['state cleanup', 'project cleanup']);
+  assert.equal(globalThis.fetch, original);
+});
