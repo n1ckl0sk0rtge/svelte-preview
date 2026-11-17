@@ -51,7 +51,7 @@ export default definePreviews(ProductCard, {
 
 Every state needs a `props` object; use `{}` for components without inputs. TypeScript definitions check props against the component. Set `viewport` per state to test different sizes.
 
-The panel follows the selected component. Toggle it for the project with **Tools → Toggle Svelte Preview**, **⌘⌥⇧P** on macOS, or **Ctrl+Alt+Shift+P** on Windows/Linux. Hiding it stops the server. Use the bottom-right controls to zoom, and click the percentage to reset to 100%.
+The panel follows the selected component. It temporarily hides for other file types and returns when you select a `.svelte` file. Manually closing it keeps it hidden until you enable it again. Toggle it for the project with **Tools → Toggle Svelte Preview**, **⌘⌥⇧P** on macOS, or **Ctrl+Alt+Shift+P** on Windows/Linux. Hidden previews stop the server. Use the bottom-right controls to zoom, and click the percentage to reset to 100%.
 
 The preview settings menu offers **Refresh**, **Create preview**, **Open in browser**, and **Restart**. Choose a Node.js interpreter under **Settings → Tools → Svelte Preview**, then restart the preview server.
 

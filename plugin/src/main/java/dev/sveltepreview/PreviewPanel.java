@@ -19,8 +19,6 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.fileEditor.FileEditorManager;
-import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
-import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.util.Disposer;
@@ -73,16 +71,6 @@ final class PreviewPanel extends JPanel implements Disposable {
         }
         add(display, BorderLayout.CENTER);
 
-        // Follow editor selections while preserving the last component when a fixture or CSS file is opened.
-        project.getMessageBus().connect(this).subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, new FileEditorManagerListener() {
-            @Override
-            public void selectionChanged(@NotNull FileEditorManagerEvent event) {
-                if (event.getNewFile() != null) select(Path.of(event.getNewFile().getPath()));
-            }
-        });
-        var files = FileEditorManager.getInstance(project).getSelectedFiles();
-        if (files.length > 0) select(Path.of(files[0].getPath()));
-
         // Follow the IDE appearance independently of the operating system's browser theme.
         ApplicationManager.getApplication().getMessageBus().connect(this).subscribe(LafManagerListener.TOPIC, manager -> {
             if (enabled && runtimeUrl != null) showPreview();
@@ -90,10 +78,9 @@ final class PreviewPanel extends JPanel implements Disposable {
     }
 
     void setPreviewEnabled(boolean value) {
-        // One project-wide switch controls automatic startup for every selected component.
+        // Stop hidden previews while the tool window controller preserves the user's preference.
         if (disposed || enabled == value) return;
         enabled = value;
-        PropertiesComponent.getInstance(project).setValue("svelte-preview.enabled", Boolean.toString(value));
         if (enabled) startRuntime();
         else stopRuntime();
     }
@@ -147,7 +134,7 @@ final class PreviewPanel extends JPanel implements Disposable {
         };
     }
 
-    private void select(Path selected) {
+    void select(Path selected) {
         // Ignore editor files that do not map to a component preview.
         Path next = PreviewPaths.componentFor(selected);
         if (next == null || next.equals(component)) return;
