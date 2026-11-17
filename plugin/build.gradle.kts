@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "dev.sveltepreview"
-version = "0.1.2"
+version = "0.1.6"
 
 repositories {
     mavenCentral()
