@@ -1,0 +1,18 @@
+{
+  "name": "svelte-preview-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "dev": "pnpm --filter @svelte-preview/demo preview",
+    "check": "pnpm --filter svelte-preview check && pnpm --filter @svelte-preview/demo check",
+    "test": "pnpm --filter svelte-preview test",
+    "build:plugin": "cd plugin && ./gradlew buildPlugin"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.4.0",
+    "typescript": "^6.0.0"
+  }
+}

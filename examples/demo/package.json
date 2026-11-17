@@ -1,0 +1,14 @@
+{
+  "name": "@svelte-preview/demo",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "preview": "svelte-preview --port 4317",
+    "check": "svelte-check --tsconfig ./jsconfig.json"
+  },
+  "dependencies": {
+    "svelte": "^5.57.3",
+    "svelte-preview": "workspace:*"
+  }
+}

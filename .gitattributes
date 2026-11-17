@@ -1,0 +1,2 @@
+# Keep Windows batch scripts on CRLF when checked out.
+*.bat text eol=crlf
