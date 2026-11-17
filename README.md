@@ -8,16 +8,19 @@ SwiftUI-style component previews for Svelte 5 in IntelliJ-based IDEs. View multi
 
 Requires **IntelliJ Platform 2026.3+** with the **JavaScript and TypeScript** plugin, **Svelte 5.46.4+**, **Node.js 22.12+ or 24+**, and **pnpm 10.32.1**. Building the IDE plugin also requires **JDK 25**.
 
-The plugin and runtime are not published yet. From a local checkout of this repository:
+Download the plugin ZIP from the [latest GitHub release](https://github.com/n1ckl0sk0rtge/svelte-preview/releases/latest).
+In the IDE, choose **Settings → Plugins → gear → Install Plugin from Disk**, select the ZIP, and restart if prompted.
+
+To build the plugin from a local checkout instead:
 
 ```sh
 pnpm install
 pnpm build:plugin
 ```
 
-In the IDE, choose **Settings → Plugins → gear → Install Plugin from Disk**, select `plugin/build/distributions/svelte-preview-0.1.2.zip`, and restart if prompted.
+The installable ZIP is written to `plugin/build/distributions/`.
 
-In the Svelte project's package directory, install the runtime from the checkout:
+The npm runtime is not published yet. In the Svelte project's package directory, install it from the checkout:
 
 ```sh
 pnpm add -D /absolute/path/to/svelte-preview/packages/runtime
