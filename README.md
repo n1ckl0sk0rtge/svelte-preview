@@ -15,7 +15,7 @@ pnpm install
 pnpm build:plugin
 ```
 
-In the IDE, choose **Settings → Plugins → gear → Install Plugin from Disk**, select `plugin/build/distributions/svelte-preview-0.1.1.zip`, and restart if prompted.
+In the IDE, choose **Settings → Plugins → gear → Install Plugin from Disk**, select `plugin/build/distributions/svelte-preview-0.1.2.zip`, and restart if prompted.
 
 In the Svelte project's package directory, install the runtime from the checkout:
 

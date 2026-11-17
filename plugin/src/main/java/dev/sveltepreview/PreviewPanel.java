@@ -29,8 +29,11 @@ import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.ui.jcef.JBCefApp;
 import com.intellij.ui.jcef.JBCefBrowser;
+import com.intellij.ui.jcef.JBCefOSRHandlerFactory;
 import com.intellij.ui.JBColor;
+import com.intellij.ui.components.JBPanelWithEmptyText;
 import org.jetbrains.annotations.NotNull;
+import org.cef.handler.CefRenderHandler;
 
 import javax.swing.*;
 import java.awt.*;
@@ -58,13 +61,26 @@ final class PreviewPanel extends JPanel implements Disposable {
         super(new BorderLayout());
         this.project = project;
 
-        // Surface setup instructions and process output when the preview cannot start.
+        // Center the guidance when no component is available to preview.
+        var empty = new JBPanelWithEmptyText().withEmptyText("No preview available");
+        empty.getEmptyText().setShowAboveCenter(false)
+            .appendLine("Open a .svelte file to see its preview.");
+        display.add(empty, "empty");
+
+        // Surface process output only when starting the preview or reporting a failure.
         logs.setEditable(false);
         logs.setLineWrap(true);
         logs.setWrapStyleWord(true);
-        logs.setText("Open a .svelte component to start its preview.\n\nInstall the local runtime in your Svelte project:\n\npnpm add -D /path/to/svelte-preview/packages/runtime\n\nUse Preview settings → Create preview to supply its props.\n\nIf Node is not found, set its executable in Settings → Tools → Svelte Preview, then choose Restart from Preview settings.");
         display.add(new JScrollPane(logs), "logs");
-        browser = JBCefApp.isSupported() ? new JBCefBrowser() : null;
+
+        // Copy complete remote frames so skipped Swing paints cannot leave preview contents blank or clipped.
+        browser = JBCefApp.isSupported() ? JBCefBrowser.createBuilder()
+            .setOSRHandlerFactory(new JBCefOSRHandlerFactory() {
+                @Override
+                public @NotNull CefRenderHandler createCefRenderHandler(@NotNull JComponent component) {
+                    return PreviewRendering.fullFrameUpdates(JBCefOSRHandlerFactory.super.createCefRenderHandler(component));
+                }
+            }).build() : null;
         if (browser != null) {
             Disposer.register(this, browser);
             display.add(browser.getComponent(), "preview");
@@ -155,8 +171,7 @@ final class PreviewPanel extends JPanel implements Disposable {
     private void startRuntime() {
         // Resolve launch inputs on the UI thread before dispatching process creation to the pool.
         if (!enabled || component == null) {
-            logs.setText("Open a .svelte component to preview it.");
-            cards("logs");
+            cards("empty");
             return;
         }
         stopRuntime();
@@ -265,8 +280,7 @@ final class PreviewPanel extends JPanel implements Disposable {
     private void createPreview() {
         // Scaffold an adjacent preview without replacing existing user data.
         if (component == null) {
-            logs.setText("Open a .svelte component to create its preview definition.");
-            cards("logs");
+            cards("empty");
             return;
         }
         String filename = component.getFileName().toString();
@@ -304,7 +318,7 @@ final class PreviewPanel extends JPanel implements Disposable {
         if (process != null) process.destroyProcess();
         process = null;
         starting = false;
-        cards("logs");
+        cards(component == null ? "empty" : "logs");
     }
 
     private void showFailure(String message) {
