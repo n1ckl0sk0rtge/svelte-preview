@@ -2,6 +2,7 @@
   "name": "svelte-preview-workspace",
   "private": true,
   "type": "module",
+  "license": "Apache-2.0",
   "packageManager": "pnpm@10.32.1",
   "scripts": {
     "dev": "pnpm --filter @svelte-preview/demo preview",

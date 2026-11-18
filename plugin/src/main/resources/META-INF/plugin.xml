@@ -1,11 +1,46 @@
-<idea-plugin>
+<idea-plugin url="https://github.com/n1ckl0sk0rtge/svelte-preview">
     <id>dev.sveltepreview</id>
     <name>Svelte Preview</name>
-    <vendor>Svelte Preview</vendor>
+    <vendor url="https://github.com/n1ckl0sk0rtge/svelte-preview" email="nicklas.koertge.projects@gmail.com">Svelte Preview</vendor>
     <description><![CDATA[
-        Preview Svelte 5 components beside your editor with typed props, named states,
-        independent interactive previews, and live updates. Requires the local svelte-preview npm package.
+        <p>Preview Svelte 5 components beside your editor. Define named states with typed props,
+        interact with each preview independently, and see changes after saving.</p>
+        <ul>
+            <li>Compare loading, empty, error, and populated states together.</li>
+            <li>Use responsive automatic sizing or fixed device viewports, with zoom controls.</li>
+            <li>Mock HTTP requests per state and share styles, setup hooks, and SvelteKit page fixtures.</li>
+        </ul>
+        <h3>Requirements</h3>
+        <p>IntelliJ Platform 2026.3 or newer with the JavaScript and TypeScript plugin and JCEF,
+        Svelte 5.46.4 or newer, Node.js 22.12+ on the 22.x line or Node.js 24+,
+        and pnpm to install the runtime.</p>
+        <h3>Setup</h3>
+        <ol>
+            <li>Install this IDE plugin.</li>
+            <li>Install the local runtime as a dev dependency from your Svelte project's package directory:
+            <code>pnpm add -D svelte-preview</code>.</li>
+            <li>Open a Svelte component and choose <b>View → Tool Windows → Svelte Preview</b>.</li>
+            <li>Click <b>Create preview</b>, define named states and their props, then save.</li>
+        </ol>
+        <p>Choose a Node.js interpreter under <b>Settings → Tools → Svelte Preview</b> if needed.
+        The preview server runs locally. Configure shared styles and project setup in
+        <code>svelte-preview.config.ts</code>.</p>
+        <p><a href="https://github.com/n1ckl0sk0rtge/svelte-preview#install">Installation and documentation</a> ·
+        <a href="https://github.com/n1ckl0sk0rtge/svelte-preview">Source code</a> ·
+        <a href="https://github.com/n1ckl0sk0rtge/svelte-preview/issues">Support and issue tracker</a> ·
+        <a href="https://github.com/n1ckl0sk0rtge/svelte-preview/releases">Release notes</a> ·
+        <a href="https://github.com/n1ckl0sk0rtge/svelte-preview/blob/main/LICENSE">Apache License 2.0</a></p>
+        <p><img src="https://raw.githubusercontent.com/n1ckl0sk0rtge/svelte-preview/main/docs/image/demo-preview.png"
+        alt="Svelte Preview showing loaded, loading, empty, and error component states beside the editor"/></p>
     ]]></description>
+    <change-notes><![CDATA[
+        <p><b>Marketplace preparation (unreleased)</b>: expanded setup instructions, requirements,
+        documentation and support links, npm runtime installation, and Apache 2.0 licensing.</p>
+        <p><b>0.1.6</b>: automatic previews fill the available canvas width across zoom levels,
+        reflow responsive content, and adjust height while preserving component state.
+        Explicit fixed viewport dimensions retain their intended layout width.</p>
+        <p><a href="https://github.com/n1ckl0sk0rtge/svelte-preview/releases/tag/v0.1.6">Full 0.1.6 release notes</a></p>
+    ]]></change-notes>
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.jcef</depends>
     <depends>JavaScript</depends>

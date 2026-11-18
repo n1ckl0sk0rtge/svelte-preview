@@ -22,7 +22,7 @@ final class PreviewPaths {
             Path candidate = directory.resolve("node_modules/svelte-preview/bin/svelte-preview.mjs");
             if (Files.isRegularFile(candidate)) return candidate;
         }
-        throw new IllegalArgumentException("Install the runtime in this package: pnpm add -D /path/to/svelte-preview/packages/runtime");
+        throw new IllegalArgumentException("Install the runtime in this package: pnpm add -D svelte-preview");
     }
 
     static String previewUrl(String baseUrl, Path root, Path component) {

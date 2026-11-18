@@ -29,3 +29,8 @@ intellijPlatform {
         ideaVersion { sinceBuild = "263" }
     }
 }
+
+// Ship the project license with the installed plugin.
+tasks.processResources {
+    from(rootProject.file("../LICENSE")) { into("META-INF") }
+}

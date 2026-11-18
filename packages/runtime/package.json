@@ -3,6 +3,16 @@
   "version": "0.1.0",
   "description": "Local component previews for Svelte 5 and JetBrains IDEs",
   "type": "module",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/n1ckl0sk0rtge/svelte-preview#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/n1ckl0sk0rtge/svelte-preview.git",
+    "directory": "packages/runtime"
+  },
+  "bugs": { "url": "https://github.com/n1ckl0sk0rtge/svelte-preview/issues" },
+  "keywords": ["svelte", "preview", "components", "jetbrains", "vite"],
+  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
   "bin": { "svelte-preview": "./bin/svelte-preview.mjs" },
   "exports": { ".": { "types": "./index.d.ts", "default": "./index.mjs" } },
   "files": ["bin", "client", "index.mjs", "index.d.ts", "mock-fetch.mjs", "setup.mjs", "setup.d.mts", "sveltekit.mjs", "server.mjs"],

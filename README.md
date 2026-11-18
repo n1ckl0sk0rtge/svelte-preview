@@ -20,11 +20,14 @@ pnpm build:plugin
 
 The installable ZIP is written to `plugin/build/distributions/`.
 
-The npm runtime is not published yet. In the Svelte project's package directory, install it from the checkout:
+In your Svelte project's package directory, install the runtime as a dev dependency:
 
 ```sh
-pnpm add -D /absolute/path/to/svelte-preview/packages/runtime
+pnpm add -D svelte-preview
 ```
+
+The runtime is versioned separately from the IDE plugin and stays pinned through your project's lockfile.
+To work on the runtime from a local checkout instead, run `pnpm add -D /absolute/path/to/svelte-preview/packages/runtime`.
 
 ## Use
 
@@ -296,3 +299,11 @@ For a browser preview in your own project, run:
 ```sh
 pnpm exec svelte-preview --root . --port 4317
 ```
+
+## Releases and support
+
+Download the plugin from the [latest release](https://github.com/n1ckl0sk0rtge/svelte-preview/releases/latest). See [all releases](https://github.com/n1ckl0sk0rtge/svelte-preview/releases) for change notes and downloads, and [GitHub Issues](https://github.com/n1ckl0sk0rtge/svelte-preview/issues) for support and bug reports. Plugin version bumps live on release branches, so the version on `main` may be older than the latest release.
+
+## License
+
+Svelte Preview, including the IDE plugin and local runtime, is licensed under the [Apache License 2.0](LICENSE).
