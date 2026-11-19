@@ -34,7 +34,7 @@
         alt="Svelte Preview showing loaded, loading, empty, and error component states beside the editor"/></p>
     ]]></description>
     <change-notes><![CDATA[
-        <p><b>Marketplace preparation (unreleased)</b>: expanded setup instructions, requirements,
+        <p><b>1.0.0</b>: expanded setup instructions, requirements,
         documentation and support links, npm runtime installation, and Apache 2.0 licensing.</p>
         <p><b>0.1.6</b>: automatic previews fill the available canvas width across zoom levels,
         reflow responsive content, and adjust height while preserving component state.
