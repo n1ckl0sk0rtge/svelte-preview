@@ -128,10 +128,13 @@ test('rapid automatic reloads pause the preview until the user resumes', async t
   await once(socket, 'open', { signal: AbortSignal.timeout(5_000) });
 
   async function editAndWait(version) {
+    // Give the watcher time to distinguish successive saves of the same file on Linux.
+    await setTimeout(100);
+
     // Listen before writing the file and ignore messages unrelated to a full reload.
     const signal = AbortSignal.timeout(5_000);
     const reload = new Promise((resolve, reject) => {
-      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      signal.addEventListener('abort', () => reject(new Error(`No reload for version ${version}`, { cause: signal.reason })), { once: true });
       const receive = (event) => {
         if (JSON.parse(event.data).type !== 'full-reload') return;
         socket.removeEventListener('message', receive);
