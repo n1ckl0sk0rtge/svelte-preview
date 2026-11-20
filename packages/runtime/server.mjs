@@ -9,6 +9,15 @@ import { validateViewport } from './index.mjs';
 const runtimeRoot = fileURLToPath(new URL('.', import.meta.url));
 const prefix = '/@svelte-preview/';
 const kitPrefix = 'virtual:svelte-preview/sveltekit/';
+const configNames = ['svelte-preview.config.ts', 'svelte-preview.config.js', 'svelte-preview.config.mjs'];
+const reloadLimit = 5;
+const reloadWindowMs = 5_000;
+const pausedContent = `<section class="sp-setup" aria-labelledby="sp-paused-title">
+  <h1 id="sp-paused-title" class="sp-setup-title">Preview paused</h1>
+  <p class="sp-empty">Several changes arrived in quick succession.</p>
+  <button type="button" id="sp-resume" class="sp-create" disabled>Resume preview</button>
+  <p id="sp-resume-status" class="sp-setup-status" role="alert"></p>
+</section>`;
 const kitModules = new Map([
   ['$app/environment', 'environment'],
   ['$app/env', 'environment'],
@@ -65,8 +74,7 @@ function validateMode(mode) {
 
 async function readConfig(root, mode) {
   // Load a dedicated config so previewing a component never starts the application's server hooks.
-  const file = ['svelte-preview.config.ts', 'svelte-preview.config.js', 'svelte-preview.config.mjs']
-    .map((name) => path.join(root, name)).find(existsSync);
+  const file = configNames.map((name) => path.join(root, name)).find(existsSync);
   const result = file ? await loadConfigFromFile({ command: 'serve', mode }, file, root, 'silent') : null;
   const config = result?.config ?? {};
   const viewport = config.viewport ?? 'auto';
@@ -93,7 +101,7 @@ async function readConfig(root, mode) {
   if (typeof setup === 'string') await access(setup);
   const styles = (config.styles ?? []).map((style) => path.resolve(root, style));
   for (const style of styles) await access(style);
-  return { ...config, viewport, styles, theme, setup };
+  return { config: { ...config, viewport, styles, theme, setup }, dependencies: result?.dependencies ?? [] };
 }
 
 function inlineSetupExpression(setup) {
@@ -108,25 +116,59 @@ function inlineSetupExpression(setup) {
   }
 }
 
-function documentHtml(entry, theme) {
+function documentHtml(entry, theme, content = '') {
   // Pass the validated theme to every document, including the standalone component list.
-  return `<!doctype html><html lang="en" data-preview-theme="${theme}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Svelte Preview</title></head><body><div id="app"></div><script type="module" src="${entry}"></script></body></html>`;
+  return `<!doctype html><html lang="en" data-preview-theme="${theme}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Svelte Preview</title></head><body><div id="app">${content}</div><script type="module" src="${entry}"></script></body></html>`;
 }
 
 export async function startPreviewServer({ root = process.cwd(), port = 0, mode } = {}) {
   // Reuse the project's Svelte configuration and aliases without booting SvelteKit routing.
   root = realpathSync(root);
   if (mode !== undefined) validateMode(mode);
-  let initialConfig = await readConfig(root, mode ?? 'preview');
-  const effectiveMode = mode ?? initialConfig.mode ?? 'preview';
-  if (effectiveMode !== (mode ?? 'preview')) initialConfig = await readConfig(root, effectiveMode);
+  const defaultMode = mode ?? 'preview';
+  let initial = await readConfig(root, defaultMode);
+  const effectiveMode = mode ?? initial.config.mode ?? defaultMode;
+  if (effectiveMode !== defaultMode) initial = await readConfig(root, effectiveMode);
+  const initialConfig = initial.config;
   const aliases = Object.fromEntries(Object.entries(initialConfig.aliases ?? {}).map(([key, value]) => [key, path.resolve(root, value)]));
   const asImport = (file) => `/@fs/${normalizePath(file)}`;
   const clientEntry = asImport(path.join(runtimeRoot, 'client/main.ts'));
+  const resumeEntry = asImport(path.join(runtimeRoot, 'client/resume.ts'));
 
   // Support project style languages when preprocessing is configured only in the app's Vite setup.
   const svelteConfig = await loadSvelteConfig({ root });
   const svelteOptions = svelteConfig?.preprocess == null ? { preprocess: vitePreprocess() } : {};
+
+  // Share one evaluation across the gallery and its frames until a config input changes.
+  const configFiles = configNames.map((name) => normalizePath(path.join(root, name)));
+  let configDependencies = initial.dependencies;
+  let watchedConfigFiles = new Set([...configFiles, ...configDependencies.map(normalizePath)]);
+  let cachedConfig = Promise.resolve(initialConfig);
+  let previewServer;
+
+  // Keep a paused preview stopped across page refreshes and component switches in this session.
+  let recentReloads = [];
+  let paused = false;
+  let lastTheme = initialConfig.theme;
+
+  function getConfig() {
+    // Coalesce concurrent requests after an edit and keep the newest load if another edit arrives.
+    if (cachedConfig) return cachedConfig;
+    const pending = readConfig(root, effectiveMode).then(({ config, dependencies }) => {
+      if (cachedConfig === pending) {
+        configDependencies = dependencies;
+        lastTheme = config.theme;
+        watchedConfigFiles = new Set([...configFiles, ...dependencies.map(normalizePath)]);
+        previewServer.watcher.add(dependencies);
+      }
+      return config;
+    }).catch((error) => {
+      if (cachedConfig === pending) cachedConfig = undefined;
+      throw error;
+    });
+    cachedConfig = pending;
+    return pending;
+  }
 
   const previewPlugin = {
     name: 'svelte-component-previews',
@@ -143,7 +185,7 @@ export async function startPreviewServer({ root = process.cwd(), port = 0, mode 
         if (module === 'environment') return 'export const browser = true, dev = true, building = false, prerendering = false, version = "";';
         if (module === 'navigation') return `export { goto } from ${JSON.stringify(kitPrefix + 'state')};`;
         if (module === 'state') {
-          const config = await readConfig(root, effectiveMode);
+          const config = await getConfig();
           return `import { createSvelteKitState } from ${JSON.stringify(asImport(path.join(runtimeRoot, 'sveltekit.mjs')))};
 const kit = createSvelteKitState();
 const defaults = ${JSON.stringify(config.sveltekit?.page ?? {})};
@@ -158,7 +200,7 @@ configurePage();`;
       // Generate static imports so Vite can track fixture and component dependencies for live updates.
       const url = new URL(id.slice(1), 'http://preview.local');
       const target = await resolveComponent(root, url.searchParams.get('file'));
-      const config = await readConfig(root, effectiveMode);
+      const config = await getConfig();
       if (!target.preview) {
         return `import { showMissingPreview } from ${JSON.stringify(clientEntry)};\nshowMissingPreview(${JSON.stringify(target.relative)});`;
       }
@@ -178,30 +220,63 @@ configurePage();`;
         : 'if (Object.values(definition.states).some(state => state.sveltekit !== undefined)) throw new Error("Enable sveltekit in svelte-preview.config to use page fixtures.");';
       return `${styles}\nimport { boot, reportError } from ${JSON.stringify(clientEntry)};\n${kitImport}\ntry { ${setup} const { default: definition } = await import(${JSON.stringify(asImport(target.preview))}); ${kitSetup} boot(definition, ${JSON.stringify(config.viewport)}, setup); } catch (error) { reportError(error); }`;
     },
-    handleHotUpdate(context) {
-      // A full reset keeps all state cards deterministic after component, fixture, or CSS edits.
-      if (!context.file.includes('/node_modules/')) {
-        context.server.moduleGraph.invalidateAll();
-        context.server.ws.send({ type: 'full-reload' });
-        return [];
+    watchChange(file) {
+      // A manual refresh must see config edits even when HMR is disabled by a project plugin.
+      if (this.environment.name === 'client' && watchedConfigFiles.has(file)) {
+        cachedConfig = undefined;
+        if (!paused) previewServer.moduleGraph.invalidateAll();
       }
     },
+    hotUpdate({ file, modules, server, type }) {
+      // Reload once for config edits, preview discovery changes, and files used by the preview.
+      if (this.environment.name !== 'client') return;
+      const configChanged = watchedConfigFiles.has(file);
+      const discoveryChanged = type !== 'update' && /(?:\.svelte|\.preview\.[jt]s)$/.test(file);
+      if (!configChanged && !discoveryChanged && !modules.length) return;
+      if (paused) return [];
+
+      // Let the last reload open the pause screen without recompiling the component.
+      const now = performance.now();
+      recentReloads = recentReloads.filter((time) => now - time < reloadWindowMs);
+      recentReloads.push(now);
+      paused = recentReloads.length >= reloadLimit;
+      if (!paused && !configChanged) server.moduleGraph.invalidateAll();
+      this.environment.hot.send({ type: 'full-reload' });
+      return [];
+    },
     configureServer(server) {
+      // Vite already watches the package root; imported config files can live in a parent workspace.
+      previewServer = server;
+      server.watcher.add(configDependencies);
+
       server.middlewares.use(async (request, response, next) => {
         const url = new URL(request.url ?? '/', 'http://preview.local');
         try {
-          // Require an explicit same-origin request before writing a neighboring preview file.
-          if (url.pathname === '/__preview/create') {
+          // Require a same-origin POST for actions initiated by the preview UI.
+          if (url.pathname === '/__preview/create' || url.pathname === '/__preview/resume') {
+            const resuming = url.pathname === '/__preview/resume';
             if (request.method !== 'POST') {
               response.statusCode = 405;
               response.setHeader('Allow', 'POST');
-              response.end('Use POST to create a preview.');
+              response.end(resuming ? 'Use POST to resume the preview.' : 'Use POST to create a preview.');
               return;
             }
             if (request.headers.origin !== new URL(server.resolvedUrls.local[0]).origin
-              || request.headers['x-svelte-preview'] !== 'create') {
+              || request.headers['x-svelte-preview'] !== (resuming ? 'resume' : 'create')) {
               response.statusCode = 403;
-              response.end('Create previews from the preview panel.');
+              response.end(resuming ? 'Resume from the preview panel.' : 'Create previews from the preview panel.');
+              return;
+            }
+
+            // Rebuild once on resume so the next request sees all edits made while paused.
+            if (resuming) {
+              if (paused) {
+                server.moduleGraph.invalidateAll();
+                recentReloads = [];
+                paused = false;
+              }
+              response.statusCode = 204;
+              response.end();
               return;
             }
 
@@ -231,15 +306,21 @@ configurePage();`;
 
           // Keep the same origin for the gallery and frames; only frames import project CSS.
           if (url.pathname === '/' || url.pathname === '/__preview/frame') {
+            response.setHeader('Content-Type', 'text/html; charset=utf-8');
+            response.setHeader('Cache-Control', 'no-store');
+            if (paused) {
+              response.end(await server.transformIndexHtml(url.pathname, documentHtml(resumeEntry, lastTheme, pausedContent)));
+              return;
+            }
+
+            // Resolve the component and its theme only for active previews.
             let entry = clientEntry;
             if (url.searchParams.has('file')) {
               await resolveComponent(root, url.searchParams.get('file'));
               const kind = url.pathname.endsWith('/frame') ? 'frame' : 'gallery';
               entry = `${prefix}${kind}?file=${encodeURIComponent(url.searchParams.get('file'))}`;
             }
-            response.setHeader('Content-Type', 'text/html; charset=utf-8');
-            response.setHeader('Cache-Control', 'no-store');
-            const config = await readConfig(root, effectiveMode);
+            const config = await getConfig();
             response.end(await server.transformIndexHtml(url.pathname, documentHtml(entry, config.theme)));
             return;
           }
@@ -251,20 +332,13 @@ configurePage();`;
           response.end(error instanceof Error ? error.message : String(error));
         }
       });
-
-      // Preview creation and deletion must also refresh a currently open gallery.
-      const refresh = () => {
-        server.moduleGraph.invalidateAll();
-        server.ws.send({ type: 'full-reload' });
-      };
-      server.watcher.on('add', refresh);
-      server.watcher.on('unlink', refresh);
     }
   };
 
-  // Bind to loopback and let the OS choose a free port when launched by the IDE.
+  // Keep the preview optimizer cache separate from the application's Vite server.
   const server = await createServer({
     root,
+    cacheDir: 'node_modules/.vite-svelte-preview',
     configFile: false,
     mode: effectiveMode,
     define: initialConfig.define,
@@ -272,6 +346,7 @@ configurePage();`;
     clearScreen: false,
     plugins: [previewPlugin, svelte(svelteOptions), ...(initialConfig.plugins ?? [])],
     resolve: { alias: { $lib: path.join(root, 'src/lib'), ...aliases }, dedupe: ['svelte'] },
+    // Bind to loopback and let the OS choose a free port when launched by the IDE.
     server: { host: '127.0.0.1', port, strictPort: port !== 0, cors: false, fs: { allow: [root, runtimeRoot] } }
   });
   await server.listen();

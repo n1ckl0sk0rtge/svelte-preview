@@ -35,6 +35,8 @@ To work on the runtime from a local checkout instead, run `pnpm add -D /absolute
 2. Click **Create preview** if the component has no preview file yet, or create a neighbouring `ComponentName.preview.ts` or `.preview.js` yourself.
 3. Define named states with their props. Save to refresh the preview.
 
+If five automatic reload requests arrive within five seconds, the preview pauses. Click **Resume preview** to load the latest changes and turn live reload back on.
+
 For example, beside `ProductCard.svelte`:
 
 ```ts
