@@ -302,6 +302,8 @@ For a browser preview in your own project, run:
 pnpm exec svelte-preview --root . --port 4317
 ```
 
+For test harnesses and agents, see the [browser automation recipe](packages/runtime/README.md#inspect-with-a-browser-harness) for discovering states, opening a single state, and waiting for it to mount.
+
 ## Releases and support
 
 Download the plugin from the [latest release](https://github.com/n1ckl0sk0rtge/svelte-preview/releases/latest). See [all releases](https://github.com/n1ckl0sk0rtge/svelte-preview/releases) for change notes and downloads, and [GitHub Issues](https://github.com/n1ckl0sk0rtge/svelte-preview/issues) for support and bug reports. Plugin version bumps live on release branches, so the version on `main` may be older than the latest release.

@@ -21,8 +21,12 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: strin
 }
 
 export function reportError(error: unknown) {
+  // Surface the same diagnostic in the document and the gallery's metadata probe.
   const message = error instanceof Error ? error.message : String(error);
-  target.replaceChildren(element('pre', 'sp-error', message));
+  const diagnostic = element('pre', 'sp-error', message);
+  diagnostic.setAttribute('data-preview-error', '');
+  target.replaceChildren(diagnostic);
+  document.documentElement.dataset.previewStatus = 'error';
   if (parameters.has('metadata')) {
     window.parent.postMessage({ type: 'svelte-preview:error', message }, window.location.origin);
   }
@@ -51,10 +55,12 @@ async function showComponents() {
     list.append(element('p', 'sp-empty', 'No Svelte components found in this project.'));
   }
   target.append(list);
+  document.documentElement.dataset.previewStatus = 'ready';
 }
 
 export function showMissingPreview(file: string) {
   // Let a gallery recover if the preview was deleted while its metadata frame was loading.
+  document.documentElement.dataset.previewStatus = 'missing';
   if (parameters.has('metadata')) {
     window.parent.postMessage({ type: 'svelte-preview:missing' }, window.location.origin);
     return;
@@ -101,13 +107,14 @@ export function boot(definition: PreviewDefinition<Component<any>>, defaultViewp
     if (parameters.has('metadata')) {
       const states = Object.entries(definition.states).map(([name, state]) => ({ name, viewport: state.viewport ?? defaultViewport }));
       window.parent.postMessage({ type: 'svelte-preview:manifest', states }, window.location.origin);
+      document.documentElement.dataset.previewStatus = 'ready';
       return;
     }
 
     // A frame imports and mounts its own copy of the definition, keeping module state separate.
     if (window.location.pathname === '/__preview/frame') {
       const stateName = parameters.get('state') ?? '';
-      const state = definition.states[stateName];
+      const state = Object.hasOwn(definition.states, stateName) ? definition.states[stateName] : undefined;
       if (!state) throw new Error(`Unknown preview state: ${stateName}`);
       document.body.style.margin = '0';
       const stopSizing = (state.viewport ?? defaultViewport) === 'auto' ? observePreviewHeight(target) : undefined;
@@ -126,6 +133,7 @@ export function boot(definition: PreviewDefinition<Component<any>>, defaultViewp
       });
       window.addEventListener('error', (event) => reportError(event.error ?? event.message));
       window.addEventListener('unhandledrejection', (event) => reportError(event.reason));
+      document.documentElement.dataset.previewStatus = 'mounted';
       return;
     }
   } catch (error) {
@@ -180,6 +188,10 @@ export function showGallery() {
       frame.title = `${name} preview`;
       frame.width = String(viewport === 'auto' ? Math.max(1, Math.floor(grid.clientWidth)) : viewport.width);
       frame.height = String(viewport === 'auto' ? 1 : viewport.height);
+
+      // Keep the configured viewport available even as the canvas resizes the iframe.
+      frame.dataset.previewState = name;
+      frame.dataset.previewViewport = JSON.stringify(viewport);
       frame.src = previewLink('/__preview/frame', { file, state: name });
       const canvas = element('div', 'sp-viewport');
       canvas.append(frame);
@@ -187,8 +199,12 @@ export function showGallery() {
       grid.append(view);
     }
     attachCanvasZoom(grid);
+    document.documentElement.dataset.previewStatus = 'ready';
   });
   target.append(probe);
 }
 
-if (!parameters.has('file')) void showComponents().catch(reportError);
+// Catch failures loading the preview entry itself, including its static style imports.
+const entry = target.dataset.previewEntry;
+if (entry) void import(/* @vite-ignore */ entry).catch(reportError);
+else if (!parameters.has('file')) void showComponents().catch(reportError);

@@ -66,7 +66,16 @@ test('standalone server discovers all example components and compiles their prev
     assert.deepEqual(await discovery.json(), ['src/lib/ProductBrowser.svelte', 'src/lib/ProductCard.svelte', 'src/lib/WelcomeCard.svelte']);
     const page = await fetch(new URL('?file=src/lib/ProductCard.svelte', base));
     assert.equal(page.status, 200);
-    assert.match(await page.text(), /@svelte-preview\/gallery/);
+    const galleryHtml = await page.text();
+    assert.match(galleryHtml, /data-preview-status="loading"/);
+    assert.match(galleryHtml, /data-preview-entry="\/@svelte-preview\/gallery\?file=src%2Flib%2FProductCard\.svelte"/);
+
+    // Start the browser client before fetching the preview module so load failures are observable.
+    const framePage = await fetch(new URL('__preview/frame?file=src/lib/ProductCard.svelte&state=Default', base));
+    const frameHtml = await framePage.text();
+    assert.match(frameHtml, /data-preview-status="loading"/);
+    assert.match(frameHtml, /data-preview-entry="\/@svelte-preview\/frame\?file=src%2Flib%2FProductCard\.svelte"/);
+    assert.match(frameHtml, /<script type="module" src="[^"]+\/client\/main\.ts">/);
 
     // Every document receives the configured default; the IDE preference stays a client-side input.
     for (const location of ['/', '?file=src/lib/ProductCard.svelte&ideTheme=dark', '__preview/frame?file=src/lib/ProductCard.svelte&state=Default&ideTheme=dark']) {

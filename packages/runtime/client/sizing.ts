@@ -1,6 +1,9 @@
 export function observePreviewHeight(target: HTMLElement) {
   // Contain child margins so the root's height reflects the complete component flow.
   target.style.display = 'flow-root';
+
+  // A standalone preview scrolls in the browser; only an embedded preview reports its height.
+  if (window.parent === window) return;
   document.documentElement.style.overflowY = 'hidden';
   let lastHeight = 0;
   let pending: number | undefined;

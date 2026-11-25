@@ -116,9 +116,10 @@ function inlineSetupExpression(setup) {
   }
 }
 
-function documentHtml(entry, theme, content = '') {
-  // Pass the validated theme to every document, including the standalone component list.
-  return `<!doctype html><html lang="en" data-preview-theme="${theme}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Svelte Preview</title></head><body><div id="app">${content}</div><script type="module" src="${entry}"></script></body></html>`;
+function documentHtml(entry, theme, { content = '', status = 'loading', previewEntry } = {}) {
+  // Publish the initial status before JavaScript runs and pass the selected module to the client.
+  const moduleAttribute = previewEntry ? ` data-preview-entry="${previewEntry}"` : '';
+  return `<!doctype html><html lang="en" data-preview-theme="${theme}" data-preview-status="${status}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Svelte Preview</title></head><body><div id="app"${moduleAttribute}>${content}</div><script type="module" src="${entry}"></script></body></html>`;
 }
 
 export async function startPreviewServer({ root = process.cwd(), port = 0, mode } = {}) {
@@ -306,22 +307,25 @@ configurePage();`;
 
           // Keep the same origin for the gallery and frames; only frames import project CSS.
           if (url.pathname === '/' || url.pathname === '/__preview/frame') {
+            // Let harnesses detect a paused preview without loading the component.
             response.setHeader('Content-Type', 'text/html; charset=utf-8');
             response.setHeader('Cache-Control', 'no-store');
             if (paused) {
-              response.end(await server.transformIndexHtml(url.pathname, documentHtml(resumeEntry, lastTheme, pausedContent)));
+              const html = documentHtml(resumeEntry, lastTheme, { content: pausedContent, status: 'paused' });
+              response.end(await server.transformIndexHtml(url.pathname, html));
               return;
             }
 
             // Resolve the component and its theme only for active previews.
-            let entry = clientEntry;
+            let previewEntry;
             if (url.searchParams.has('file')) {
               await resolveComponent(root, url.searchParams.get('file'));
               const kind = url.pathname.endsWith('/frame') ? 'frame' : 'gallery';
-              entry = `${prefix}${kind}?file=${encodeURIComponent(url.searchParams.get('file'))}`;
+              previewEntry = `${prefix}${kind}?file=${encodeURIComponent(url.searchParams.get('file'))}`;
             }
             const config = await getConfig();
-            response.end(await server.transformIndexHtml(url.pathname, documentHtml(entry, config.theme)));
+            const html = documentHtml(clientEntry, config.theme, { previewEntry });
+            response.end(await server.transformIndexHtml(url.pathname, html));
             return;
           }
           next();

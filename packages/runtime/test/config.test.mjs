@@ -155,6 +155,7 @@ test('rapid automatic reloads pause the preview until the user resumes', async t
   const pausedFrame = await document(frame);
   assert.match(pausedFrame, /Resume preview/);
   assert.match(pausedFrame, /data-preview-theme="dark"/);
+  assert.match(pausedFrame, /data-preview-status="paused"/);
   assert.doesNotMatch(pausedFrame, /@svelte-preview\/frame/);
 
   // Edits and ordinary refreshes leave the pause in place until the explicit resume action.
@@ -168,6 +169,7 @@ test('rapid automatic reloads pause the preview until the user resumes', async t
     method: 'POST', headers: { Origin: base.origin, 'X-Svelte-Preview': 'resume' }
   })).status, 204);
   assert.match(await document(gallery), /@svelte-preview\/gallery/);
+  assert.match(await document(frame), /data-preview-status="loading"/);
   assert.match((await server.transformRequest('/Card.svelte')).code, /Version 6/);
 
   // Resuming starts a fresh reload window and restores ordinary live updates.
