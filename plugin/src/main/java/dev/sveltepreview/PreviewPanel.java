@@ -1,5 +1,6 @@
 package dev.sveltepreview;
 
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.intellij.icons.AllIcons;
 import com.intellij.execution.configurations.GeneralCommandLine;
@@ -40,6 +41,7 @@ import java.awt.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 
@@ -275,6 +277,26 @@ final class PreviewPanel extends JPanel implements Disposable {
 
     private String previewUrl() {
         return PreviewPaths.previewUrl(runtimeUrl, runtimeRoot, component) + "&ideTheme=" + (JBColor.isBright() ? "light" : "dark");
+    }
+
+    CompletableFuture<JsonObject> inspectPreview(String state) {
+        // Use the same lifecycle as the tool window and leave the current editor selection alone.
+        var preview = new JsonObject();
+        if (disposed || !enabled || component == null) {
+            return CompletableFuture.completedFuture(PreviewInspection.withStatus(preview, "inactive"));
+        }
+        if (runtimeUrl == null) {
+            return CompletableFuture.completedFuture(PreviewInspection.withStatus(preview, starting ? "starting" : "unavailable"));
+        }
+
+        // Share the exact URL and component path used by the embedded browser.
+        preview.addProperty("galleryUrl", previewUrl());
+        preview.addProperty("packageRoot", runtimeRoot.toString());
+        preview.addProperty("component", PreviewPaths.relativeComponent(runtimeRoot, component));
+        if (browser == null) {
+            return CompletableFuture.completedFuture(PreviewInspection.withStatus(preview, "unavailable"));
+        }
+        return PreviewInspection.read(browser.getCefBrowser(), preview, state);
     }
 
     private void createPreview() {

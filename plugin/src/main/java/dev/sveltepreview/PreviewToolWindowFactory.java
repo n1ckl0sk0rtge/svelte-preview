@@ -67,6 +67,11 @@ public final class PreviewToolWindowFactory implements ToolWindowFactory {
         return controller != null && controller.state != null && controller.state.isEnabled();
     }
 
+    static PreviewPanel existingPanel(Project project) {
+        var controller = project.getUserData(VISIBILITY);
+        return controller == null ? null : controller.panel;
+    }
+
     static void setPreviewEnabled(Project project, boolean enabled) {
         // The shortcut must also disable previews while they are temporarily hidden.
         var controller = project.getUserData(VISIBILITY);

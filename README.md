@@ -63,6 +63,12 @@ The panel follows the selected component. It temporarily hides for other file ty
 
 The preview settings menu offers **Refresh**, **Create preview**, **Open in browser**, and **Restart**. Choose a Node.js interpreter under **Settings → Tools → Svelte Preview**, then restart the preview server.
 
+### Inspect from an IntelliJ-connected agent
+
+Connect your harness to [IntelliJ's MCP server](https://www.jetbrains.com/help/idea/mcp-server.html), open a Svelte component, and show **Svelte Preview**. Call `svelte_preview_inspect` to discover the gallery and state names. Pass an exact `state` to read its status and rendered text from the live IDE preview. Set `include_guide: true` for setup, fixture, and browser instructions directly through MCP.
+
+The MCP tool uses the embedded preview, including the results of interactions you already made in the panel. The bundled agent skill covers standalone use and setups without an MCP connection.
+
 ## Mock requests
 
 Register fetch responses in a state's synchronous `setup` hook, before the component initializes:

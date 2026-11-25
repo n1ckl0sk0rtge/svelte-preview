@@ -44,6 +44,7 @@
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.jcef</depends>
     <depends>JavaScript</depends>
+    <depends optional="true" config-file="svelte-preview-mcp.xml">com.intellij.mcpServer</depends>
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow id="Svelte Preview" anchor="right"
                     icon="/icons/toolWindow.svg"

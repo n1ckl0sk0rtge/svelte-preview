@@ -2,6 +2,7 @@ node_modules/
 .DS_Store
 .idea/
 .gradle/
+/plugin/.kotlin/
 .intellijPlatform/
 build/
 .svelte-kit/

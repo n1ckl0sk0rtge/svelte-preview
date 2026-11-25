@@ -45,13 +45,15 @@ See the [documentation](https://github.com/n1ckl0sk0rtge/svelte-preview#configur
 
 ## Install the agent skill
 
-Run this command from your project directory.
+For standalone previews or when your harness has no IntelliJ MCP connection, run this command from your project directory.
 
 ```sh
 pnpm exec svelte-preview install-skill
 ```
 
 This installs the bundled `$svelte-preview` skill at `.agents/skills/svelte-preview/SKILL.md`. It teaches agents how to define and configure previews and how to inspect them in a browser or IntelliJ. In a monorepo, pass `--root <repo-directory>` to install it for the whole repository. Share the installed file with your team by committing it. Repeating the command keeps an identical file in place and reports a conflict if the existing skill differs.
+
+An IntelliJ-connected harness gets the same guidance from `svelte_preview_inspect` with `include_guide: true`. [IntelliJ MCP workflow](https://github.com/n1ckl0sk0rtge/svelte-preview#inspect-from-an-intellij-connected-agent)
 
 ## Inspect with a browser harness
 

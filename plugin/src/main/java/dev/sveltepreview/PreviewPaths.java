@@ -26,8 +26,11 @@ final class PreviewPaths {
     }
 
     static String previewUrl(String baseUrl, Path root, Path component) {
-        String relative = root.relativize(component).toString().replace('\\', '/');
-        return baseUrl + "?file=" + URLEncoder.encode(relative, StandardCharsets.UTF_8);
+        return baseUrl + "?file=" + URLEncoder.encode(relativeComponent(root, component), StandardCharsets.UTF_8);
+    }
+
+    static String relativeComponent(Path root, Path component) {
+        return root.relativize(component).toString().replace('\\', '/');
     }
 
     static Path componentFor(Path selected) {

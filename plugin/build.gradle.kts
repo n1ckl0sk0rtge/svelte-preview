@@ -1,5 +1,6 @@
 plugins {
     java
+    kotlin("jvm") version "2.4.10"
     id("org.jetbrains.intellij.platform") version "2.19.0"
 }
 
@@ -20,6 +21,7 @@ dependencies {
     intellijPlatform {
         intellijIdea("2026.3")
         bundledPlugin("com.intellij.modules.jcef")
+        bundledPlugin("com.intellij.mcpServer")
         bundledPlugin("JavaScript")
     }
 }
