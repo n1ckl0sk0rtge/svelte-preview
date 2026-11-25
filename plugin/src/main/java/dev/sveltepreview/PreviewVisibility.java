@@ -4,6 +4,7 @@ final class PreviewVisibility {
     private boolean enabled;
     private boolean visible;
     private boolean svelteSelected;
+    private boolean runtimeActive;
 
     PreviewVisibility(boolean enabled) {
         this.enabled = enabled;
@@ -17,20 +18,33 @@ final class PreviewVisibility {
         return visible;
     }
 
+    boolean isRuntimeActive() {
+        return runtimeActive;
+    }
+
     void selectFile(String name) {
         // Temporarily hide other file types without changing the user's preference.
         svelteSelected = name != null && name.endsWith(".svelte");
-        visible = enabled && svelteSelected;
+        followSelection();
     }
 
     void setEnabled(boolean value) {
         enabled = value;
-        visible = enabled && svelteSelected;
+        followSelection();
     }
 
-    void windowVisibilityChanged(boolean value) {
-        // Notifications matching our requested visibility are automatic, not user toggles.
+    private void followSelection() {
+        // Keep an existing preview available to MCP while focus moves away from the component.
+        visible = enabled && svelteSelected;
+        runtimeActive = enabled && (runtimeActive || svelteSelected);
+    }
+
+    void windowVisibilityChanged(boolean value, boolean hideAction) {
+        // Our own visibility changes already match the native notification.
         if (visible == value) return;
-        setEnabled(value);
+
+        // Another tool window can cover this one without closing its preview.
+        if (value || hideAction) setEnabled(value);
+        else visible = false;
     }
 }

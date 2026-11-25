@@ -36,8 +36,8 @@ public final class PreviewToolWindowFactory implements ToolWindowFactory {
         });
         connection.subscribe(ToolWindowManagerListener.TOPIC, new ToolWindowManagerListener() {
             @Override
-            public void stateChanged(@NotNull ToolWindowManager manager) {
-                controller.windowVisibilityChanged();
+            public void stateChanged(@NotNull ToolWindowManager manager, @NotNull ToolWindowManagerEventType change) {
+                controller.windowVisibilityChanged(change == ToolWindowManagerEventType.HideToolWindow);
             }
         });
 
@@ -56,7 +56,7 @@ public final class PreviewToolWindowFactory implements ToolWindowFactory {
         // Put the preview gear on the right of the native title bar beside the window controls.
         toolWindow.setTitleActions(List.of(panel.previewActions()));
 
-        // Keep runtime activity tied to the panel's temporary visibility, not the saved preference.
+        // Let the controller select the initial component and start its preview once the panel is ready.
         var controller = project.getUserData(VISIBILITY);
         controller.panel = panel;
         ApplicationManager.getApplication().invokeLater(controller::selectCurrentFile);
@@ -119,16 +119,16 @@ public final class PreviewToolWindowFactory implements ToolWindowFactory {
             apply();
         }
 
-        private void windowVisibilityChanged() {
+        private void windowVisibilityChanged(boolean hideAction) {
             if (unavailable() || state == null) return;
-            state.windowVisibilityChanged(window.isVisible());
+            state.windowVisibilityChanged(window.isVisible(), hideAction);
             apply();
         }
 
         private void apply() {
-            // Save only the preference; automatic hides must not disable future Svelte previews.
+            // Save the preference and keep active runtime state independent of panel visibility.
             PropertiesComponent.getInstance(project).setValue("svelte-preview.enabled", Boolean.toString(state.isEnabled()));
-            if (panel != null) panel.setPreviewEnabled(state.isVisible());
+            if (panel != null) panel.setRuntimeActive(state.isRuntimeActive());
 
             // Record desired visibility in the state before synchronous native notifications arrive.
             if (window.isVisible() == state.isVisible()) return;

@@ -95,8 +95,8 @@ final class PreviewPanel extends JPanel implements Disposable {
         });
     }
 
-    void setPreviewEnabled(boolean value) {
-        // Stop hidden previews while the tool window controller preserves the user's preference.
+    void setRuntimeActive(boolean value) {
+        // Toggling the preview off ends its runtime session.
         if (disposed || enabled == value) return;
         enabled = value;
         if (enabled) startRuntime();

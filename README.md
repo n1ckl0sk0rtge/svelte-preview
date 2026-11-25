@@ -59,7 +59,7 @@ export default definePreviews(ProductCard, {
 
 Every state needs a `props` object; use `{}` for components without inputs. TypeScript definitions check props against the component. By default, previews fill the canvas width with 24 px padding on each side and grow or shrink with their content. Resizing the tool window updates their width. Set an explicit `viewport` per state to test a fixed device size.
 
-The panel follows the selected component. It temporarily hides for other file types and returns when you select a `.svelte` file. Manually closing it keeps it hidden until you enable it again. Toggle it for the project with **Tools → Toggle Svelte Preview**, **⌘⌥⇧P** on macOS, or **Ctrl+Alt+Shift+P** on Windows/Linux. Hidden previews stop the server. Use the bottom-right controls to zoom, and click the percentage to reset to 100%.
+The panel follows the selected component. It temporarily hides for other file types and returns when you select a `.svelte` file. The last preview stays available to MCP while you switch tabs or open another tool window. Closing the panel manually or toggling Svelte Preview off stops the preview server. Toggle it for the project with **Tools → Toggle Svelte Preview**, **⌘⌥⇧P** on macOS, or **Ctrl+Alt+Shift+P** on Windows/Linux. Use the bottom-right controls to zoom, and click the percentage to reset to 100%.
 
 The preview settings menu offers **Refresh**, **Create preview**, **Open in browser**, and **Restart**. Choose a Node.js interpreter under **Settings → Tools → Svelte Preview**, then restart the preview server.
 
