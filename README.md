@@ -302,7 +302,7 @@ For a browser preview in your own project, run:
 pnpm exec svelte-preview --root . --port 4317
 ```
 
-For test harnesses and agents, see the [browser automation recipe](packages/runtime/README.md#inspect-with-a-browser-harness) for discovering states, opening a single state, and waiting for it to mount.
+Run `pnpm exec svelte-preview install-skill` to [install the agent skill](packages/runtime/README.md#install-the-agent-skill). The [browser automation recipe](packages/runtime/README.md#inspect-with-a-browser-harness) shows how a harness can discover states, open a single state, and wait for it to mount.
 
 ## Releases and support
 

@@ -15,7 +15,7 @@
   "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
   "bin": { "svelte-preview": "./bin/svelte-preview.mjs" },
   "exports": { ".": { "types": "./index.d.ts", "default": "./index.mjs" } },
-  "files": ["bin", "client", "index.mjs", "index.d.ts", "mock-fetch.mjs", "setup.mjs", "setup.d.mts", "sveltekit.mjs", "server.mjs"],
+  "files": ["bin", "client", "skills", "index.mjs", "index.d.ts", "mock-fetch.mjs", "setup.mjs", "setup.d.mts", "sveltekit.mjs", "server.mjs"],
   "scripts": {
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "node --test test/*.test.mjs"

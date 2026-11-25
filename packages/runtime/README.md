@@ -43,6 +43,16 @@ The runtime is installed per project and versioned independently from the IDE pl
 
 See the [documentation](https://github.com/n1ckl0sk0rtge/svelte-preview#configure) for global styles, Tailwind, SCSS, HTTP mocks, setup hooks, and SvelteKit fixtures. Report problems through [GitHub Issues](https://github.com/n1ckl0sk0rtge/svelte-preview/issues).
 
+## Install the agent skill
+
+Run this command from your project directory.
+
+```sh
+pnpm exec svelte-preview install-skill
+```
+
+This installs the bundled `$svelte-preview` skill at `.agents/skills/svelte-preview/SKILL.md`. It teaches agents how to define and configure previews and how to inspect them in a browser or IntelliJ. In a monorepo, pass `--root <repo-directory>` to install it for the whole repository. Share the installed file with your team by committing it. Repeating the command keeps an identical file in place and reports a conflict if the existing skill differs.
+
 ## Inspect with a browser harness
 
 Start `pnpm exec svelte-preview --root . --port 0` in the Svelte package directory and read the `url` from the JSON on the `SVELTE_PREVIEW_READY ` stdout line. The server listens on loopback, so run the browser where it can reach that address.
