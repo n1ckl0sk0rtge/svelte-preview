@@ -1,9 +1,15 @@
 ---
 name: release-plugin
-description: Create a versioned GitHub release of this repository's JetBrains Svelte Preview plugin from a release/x.x.x branch, with tests and an installable ZIP. Use for plugin release requests, not npm runtime or JetBrains Marketplace publishing.
+description: Release the Svelte Preview JetBrains plugin on GitHub and publish a new npm runtime version when the shipped runtime changes. Also use for npm-only runtime releases.
 ---
 
-# Release the Svelte Preview plugin
+# Release Svelte Preview
+
+Fetch origin and read the [npm runtime release instructions](references/npm-runtime.md).
+For a plugin release, compare the last published npm runtime with `origin/main`.
+Publish the runtime first if its shipped code, CLI, bundled skill, or runtime
+dependencies changed. If the runtime is current, proceed to the plugin release.
+For an npm-only request, complete the runtime workflow.
 
 The release branch is `release/x.x.x`, the Git tag is `vx.x.x`, and the asset is
 `plugin/build/distributions/svelte-preview-x.x.x.zip`. The version source is
@@ -18,11 +24,13 @@ The release branch is `release/x.x.x`, the Git tag is `vx.x.x`, and the asset is
    both the current plugin version and the latest stable plugin release, and
    state that choice. `main` may still contain an earlier version because version
    bumps belong to release branches.
-3. Fetch origin and create `release/x.x.x` from the current `origin/main`.
+3. Fetch origin. If `origin/main` advanced since the npm check, check the runtime
+   diff again before creating `release/x.x.x` from the current `origin/main`.
    If that branch or tag already exists, inspect it and resume only when it
    matches this release. Do not overwrite published releases or force-push tags.
 4. Change `version` in `plugin/build.gradle.kts` to `x.x.x` on this branch. Update
-   any documentation that names the old plugin ZIP. Keep runtime versions unchanged.
+   any documentation that names the old plugin ZIP. The branch inherits the runtime
+   version from `main`.
 
 ## Validate and package
 
@@ -55,9 +63,9 @@ this build, not an older file in the distributions directory.
 2. Write release notes to a temporary file outside the working tree. Describe
    user-visible changes since the previous plugin tag, list the IDE/JDK/runtime
    requirements from the README, and explain installing the attached ZIP through
-   **Settings → Plugins → Install Plugin from Disk**. For the first release,
-   describe the current capabilities. State how to install the unpublished runtime
-   from a local checkout if it is still unpublished.
+   **Settings → Plugins → Install Plugin from Disk**. Include the npm runtime
+   version users should install. For the first release, describe the current
+   capabilities.
 3. Tag the verified release-branch commit and push the tag:
 
    ```sh
@@ -78,7 +86,7 @@ this build, not an older file in the distributions directory.
    version, and test results. Leave the version bump on the release branch;
    merging it into `main` is a separate task.
 
-If authentication, pushes, CI, or publication fails, stop at that failed step and
-report what remains. Inspect remote state before retrying a partially completed
-publication. A release request authorizes this branch, tag, and GitHub release;
-do not add another approval step when the user already requested publication.
+If a step fails, inspect the remote state before retrying and report any blocker
+that remains. A plugin release request covers the branch, tag, GitHub release,
+and the conditional npm release. JetBrains Marketplace publishing requires its
+own request.
