@@ -1,19 +1,30 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getProduct } from '../../../examples/demo/src/lib/infrastructure/ProductRepository.js';
+import { listServices } from '../../../examples/demo/src/lib/infrastructure/ServiceRepository.js';
+import { runPreviewSetup } from '../setup.mjs';
 
 test('the named repository function uses the preview fetch override', async t => {
-  const product = { name: 'Preview headphones', price: 42, available: true };
-  t.mock.method(globalThis, 'fetch', async () => Response.json(product));
-  assert.deepEqual(await getProduct('studio', 'headphones'), product);
+  // Register the demo's real API route through the same setup hook as its preview.
+  const services = [
+    { id: 'edge', name: 'Edge gateway', protocol: 'HTTPS', port: 443, routing: 'Round robin' }
+  ];
+  t.after(runPreviewSetup(({ http }) => {
+    http.get('/api/v1/projects/studio/services', { body: services });
+  }));
+  assert.deepEqual(await listServices('studio'), services);
 });
 
-test('the normal repository reads the product and reports failed requests', async t => {
-  const fetch = t.mock.method(globalThis, 'fetch', async url => {
-    assert.equal(url, '/api/v1/projects/studio%20one/products/head%2Fphones');
-    return Response.json({ name: 'Headphones' });
+test('the normal repository reads services and reports failed requests', async t => {
+  // Exercise URL encoding and pass cancellation through to the underlying fetch.
+  const controller = new AbortController();
+  const fetch = t.mock.method(globalThis, 'fetch', async (url, options) => {
+    assert.equal(url, '/api/v1/projects/studio%2Fone/services');
+    assert.equal(options.signal, controller.signal);
+    return Response.json([]);
   });
-  assert.deepEqual(await getProduct('studio one', 'head/phones'), { name: 'Headphones' });
+  assert.deepEqual(await listServices('studio/one', controller.signal), []);
+
+  // HTTP failures reject the request so the component can render its error state.
   fetch.mock.mockImplementation(async () => new Response(null, { status: 503 }));
-  await assert.rejects(getProduct('studio', 'headphones'), /Could not load product \(503\)/);
+  await assert.rejects(listServices('studio'), /Could not load service endpoints \(503\)/);
 });

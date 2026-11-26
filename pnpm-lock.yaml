@@ -23,6 +23,9 @@ importers:
 
   examples/demo:
     dependencies:
+      carbon-components-svelte:
+        specifier: 0.114.7
+        version: 0.114.7
       svelte:
         specifier: ^5.57.3
         version: 5.57.3
@@ -56,6 +59,10 @@ packages:
 
   '@emnapi/wasi-threads@2.2.0':
     resolution: {integrity: sha512-JP7OYH38Q7+pyTAe14raZHLQIK7BDKbdwji+Xi3pcd/6QkJYQH3SX4wu6EplGrGJWRepoNzedfm0G3B9Z4e9Rw==}
+
+  '@ibm/telemetry-js@1.12.0':
+    resolution: {integrity: sha512-tNgmk2k8loNDTnPInlu7yMP9YOCr9UMwSnXN7SCEsGIV8xHfTawhXlDnp1PV0Lbv+2GoLQKSgkShlJeGPi4jTg==}
+    hasBin: true
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -306,6 +313,9 @@ packages:
   axobject-query@4.1.0:
     resolution: {integrity: sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ==}
     engines: {node: '>= 0.4'}
+
+  carbon-components-svelte@0.114.7:
+    resolution: {integrity: sha512-T0oTeaHgd763wrf13iEKwO7bIQ7LXwvriJvV9TyAZxZEM5ypEPbxGRv47ZeEYoStmKiOoPrFzhAbIIK0GL7blQ==}
 
   chokidar@4.0.3:
     resolution: {integrity: sha512-Qgzu8kfBvo+cA4962jnP1KkS6Dop5NS6g7R5LFYJr4b8Ub94PPQXUksCw9PvXoeXPRRddRNC5C1JQUR2SMGtnA==}
@@ -604,6 +614,8 @@ snapshots:
       tslib: 2.9.1
     optional: true
 
+  '@ibm/telemetry-js@1.12.0': {}
+
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
@@ -774,6 +786,10 @@ snapshots:
   aria-query@5.3.1: {}
 
   axobject-query@4.1.0: {}
+
+  carbon-components-svelte@0.114.7:
+    dependencies:
+      '@ibm/telemetry-js': 1.12.0
 
   chokidar@4.0.3:
     dependencies:

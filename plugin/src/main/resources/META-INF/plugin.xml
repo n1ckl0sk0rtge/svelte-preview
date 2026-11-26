@@ -31,7 +31,7 @@
         <a href="https://github.com/n1ckl0sk0rtge/svelte-preview/releases">Release notes</a> ·
         <a href="https://github.com/n1ckl0sk0rtge/svelte-preview/blob/main/LICENSE">Apache License 2.0</a></p>
         <p><img src="https://raw.githubusercontent.com/n1ckl0sk0rtge/svelte-preview/main/docs/image/demo-preview.png"
-        alt="Svelte Preview showing loaded, loading, empty, and error component states beside the editor"/></p>
+        alt="Svelte Preview showing a Carbon DataTable and its loading skeleton beside the editor"/></p>
     ]]></description>
     <change-notes><![CDATA[
         <p><b>Marketplace preparation (unreleased)</b>: expanded setup instructions, requirements,

@@ -8,6 +8,7 @@
     "check": "svelte-check --tsconfig ./jsconfig.json"
   },
   "dependencies": {
+    "carbon-components-svelte": "0.114.7",
     "svelte": "^5.57.3",
     "svelte-preview": "workspace:*"
   }

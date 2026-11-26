@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { copyFile, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +14,7 @@ test('missing previews have a themed empty state and explicit creation never ove
   await mkdir(components, { recursive: true });
   await symlink(fileURLToPath(new URL('../../../examples/demo/node_modules', import.meta.url)), path.join(root, 'node_modules'));
   await writeFile(path.join(root, 'package.json'), '{"type":"module"}');
-  await copyFile(fileURLToPath(new URL('../../../examples/demo/src/lib/WelcomeCard.svelte', import.meta.url)), path.join(components, 'Welcome Card.svelte'));
+  await writeFile(path.join(components, 'Welcome Card.svelte'), '<h1>Welcome</h1>');
   const server = await startPreviewServer({ root });
   t.after(async () => {
     await server.close();

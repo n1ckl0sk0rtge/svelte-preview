@@ -56,50 +56,48 @@ test('component resolution handles spaced filenames and rejects traversal and sy
   }
 });
 
-test('standalone server discovers all example components and compiles their previews', async () => {
+test('standalone server discovers the demo component and compiles its previews', async () => {
   // Exercise the same HTML and module endpoints consumed by JCEF instead of mocking Vite.
   const root = fileURLToPath(new URL('../../../examples/demo', import.meta.url));
   const server = await startPreviewServer({ root });
   const base = server.resolvedUrls.local[0];
   try {
     const discovery = await fetch(new URL('__preview/components', base));
-    assert.deepEqual(await discovery.json(), ['src/lib/ProductBrowser.svelte', 'src/lib/ProductCard.svelte', 'src/lib/WelcomeCard.svelte']);
-    const page = await fetch(new URL('?file=src/lib/ProductCard.svelte', base));
+    assert.deepEqual(await discovery.json(), ['src/lib/ServicesTable.svelte']);
+    const page = await fetch(new URL('?file=src/lib/ServicesTable.svelte', base));
     assert.equal(page.status, 200);
     const galleryHtml = await page.text();
     assert.match(galleryHtml, /data-preview-status="loading"/);
-    assert.match(galleryHtml, /data-preview-entry="\/@svelte-preview\/gallery\?file=src%2Flib%2FProductCard\.svelte"/);
+    assert.match(galleryHtml, /data-preview-entry="\/@svelte-preview\/gallery\?file=src%2Flib%2FServicesTable\.svelte"/);
 
     // Start the browser client before fetching the preview module so load failures are observable.
-    const framePage = await fetch(new URL('__preview/frame?file=src/lib/ProductCard.svelte&state=Default', base));
+    const framePage = await fetch(new URL('__preview/frame?file=src/lib/ServicesTable.svelte&state=Loaded', base));
     const frameHtml = await framePage.text();
     assert.match(frameHtml, /data-preview-status="loading"/);
-    assert.match(frameHtml, /data-preview-entry="\/@svelte-preview\/frame\?file=src%2Flib%2FProductCard\.svelte"/);
+    assert.match(frameHtml, /data-preview-entry="\/@svelte-preview\/frame\?file=src%2Flib%2FServicesTable\.svelte"/);
     assert.match(frameHtml, /<script type="module" src="[^"]+\/client\/main\.ts">/);
 
-    // Every document receives the configured default; the IDE preference stays a client-side input.
-    for (const location of ['/', '?file=src/lib/ProductCard.svelte&ideTheme=dark', '__preview/frame?file=src/lib/ProductCard.svelte&state=Default&ideTheme=dark']) {
+    // Every document receives the demo's dark theme, even when the IDE uses a light theme.
+    for (const location of ['/', '?file=src/lib/ServicesTable.svelte&ideTheme=light', '__preview/frame?file=src/lib/ServicesTable.svelte&state=Loaded&ideTheme=light']) {
       const document = await fetch(new URL(location, base));
       assert.equal(document.status, 200);
-      assert.match(await document.text(), /data-preview-theme="auto"/);
+      assert.match(await document.text(), /data-preview-theme="dark"/);
     }
 
-    // Compile JavaScript components and fixtures with TypeScript previews, not just the readiness response.
-    const compiled = await server.transformRequest('/@svelte-preview/frame?file=src/lib/ProductCard.svelte');
-    assert.match(compiled.code, /ProductCard\.preview\.ts/);
+    // The state frame imports the TypeScript definition and Carbon styles independently of the gallery.
+    const compiled = await server.transformRequest('/@svelte-preview/frame?file=src/lib/ServicesTable.svelte');
+    assert.match(compiled.code, /ServicesTable\.preview\.ts/);
     assert.match(compiled.code, /app\.css/);
-    const gallery = await server.transformRequest('/@svelte-preview/gallery?file=src/lib/ProductCard.svelte');
-    assert.doesNotMatch(gallery.code, /ProductCard\.preview\.ts|app\.css/);
-    const component = await server.transformRequest('/src/lib/ProductCard.svelte');
-    assert.match(component.code, /Add to bag/);
+    const gallery = await server.transformRequest('/@svelte-preview/gallery?file=src/lib/ServicesTable.svelte');
+    assert.doesNotMatch(gallery.code, /ServicesTable\.preview\.ts|app\.css/);
 
-    // Compile the setup wrapper and direct-repository example through the real Svelte/Vite pipeline.
+    // Compile the setup wrapper and repository-backed table through the real Svelte/Vite pipeline.
     const wrapperPath = fileURLToPath(new URL('../client/PreviewRoot.svelte', import.meta.url));
     const wrapper = await server.transformRequest(`/@fs/${wrapperPath}`);
     assert.match(wrapper.code, /setup/);
-    const browser = await server.transformRequest('/src/lib/ProductBrowser.svelte');
-    assert.match(browser.code, /ProductCard/);
-    assert.match(browser.code, /getProduct/);
+    const component = await server.transformRequest('/src/lib/ServicesTable.svelte');
+    assert.match(component.code, /DataTableSkeleton/);
+    assert.match(component.code, /listServices/);
 
     const missing = await fetch(new URL('?file=Missing.svelte', base));
     assert.equal(missing.status, 400);
